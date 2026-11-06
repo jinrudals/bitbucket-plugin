@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,10 +52,25 @@ public final class JobMatcher {
                 triggers.add(bt);
             }
         }
-        if (triggers.isEmpty() || !matches(job, repo)) {
+        if (triggers.isEmpty()) {
             return;
         }
-        result.addAll(triggers);
+        Boolean scmMatch = null;
+        for (BitbucketTrigger bt : triggers) {
+            Optional<RepoKey> explicit = bt.explicitRepository();
+            if (explicit.isPresent()) {
+                if (explicit.get().equals(repo)) {
+                    result.add(bt);
+                }
+                continue;
+            }
+            if (scmMatch == null) {
+                scmMatch = matches(job, repo);
+            }
+            if (scmMatch) {
+                result.add(bt);
+            }
+        }
     }
 
     private static boolean matches(Job<?, ?> job, RepoKey repo) {
