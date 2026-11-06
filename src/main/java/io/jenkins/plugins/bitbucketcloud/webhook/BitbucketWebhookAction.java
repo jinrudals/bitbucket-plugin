@@ -28,7 +28,7 @@ import org.kohsuke.stapler.StaplerResponse;
 @Extension
 public class BitbucketWebhookAction implements UnprotectedRootAction {
     static final String URL_NAME = "bitbucket-webhook";
-    static final int MAX_BODY_BYTES = 25 * 1024 * 1024;
+    static final int MAX_BODY_BYTES = 5 * 1024 * 1024;
     private static final Logger LOGGER = Logger.getLogger(BitbucketWebhookAction.class.getName());
 
     @Override
@@ -52,19 +52,24 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
             reply(rsp, 405, "POST required");
             return;
         }
+        if (req.getContentLengthLong() > MAX_BODY_BYTES) {
+            reply(rsp, 413, "Payload too large");
+            return;
+        }
         byte[] body = readBody(req.getInputStream());
         if (body == null) {
             reply(rsp, 413, "Payload too large");
             return;
         }
         BitbucketGlobalConfig config = BitbucketGlobalConfig.get();
-        if (!config.isAllowUnsignedWebhooks()) {
-            Optional<String> secret = config.webhookSecret();
-            if (secret.isEmpty() || !SignatureVerifier.verify(body, req.getHeader("X-Hub-Signature"), secret.get())) {
-                LOGGER.log(Level.FINE, "Rejected webhook: signature missing/invalid or no secret configured");
-                reply(rsp, 401, "Unauthorized");
-                return;
-            }
+        Optional<String> secret = config.webhookSecret();
+        boolean verified = secret.isPresent()
+                && SignatureVerifier.verify(body, req.getHeader("X-Hub-Signature"), secret.get());
+        // Unsigned webhooks are tolerated only when no secret is configured at all.
+        if (!verified && (secret.isPresent() || !config.isAllowUnsignedWebhooks())) {
+            LOGGER.log(Level.FINE, "Rejected webhook: signature missing/invalid or no secret configured");
+            reply(rsp, 401, "Unauthorized");
+            return;
         }
         if (body.length == 0) {
             reply(rsp, 400, "Empty payload");

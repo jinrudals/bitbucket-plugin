@@ -154,4 +154,21 @@ class BitbucketWebhookActionTest {
         assertInstanceOf(PushEvent.class, e);
         assertEquals("feature/x", ((PushEvent) e).branch());
     }
+
+    @Test
+    void secretConfiguredAlwaysVerifiedEvenIfUnsignedAllowed() throws Exception {
+        BitbucketGlobalConfig.get().setAllowUnsignedWebhooks(true);
+        byte[] body = fixture("push.json");
+        assertEquals(401, post(body, "repo:push", "sha256=" + "00".repeat(32)).statusCode());
+        assertEquals(401, post(body, "repo:push", null).statusCode());
+        assertNull(RECEIVED.poll(500, TimeUnit.MILLISECONDS));
+        assertEquals(202, post(body, "repo:push", sign(body)).statusCode());
+    }
+
+    @Test
+    void oversizedBodyIs413() throws Exception {
+        byte[] big = new byte[BitbucketWebhookAction.MAX_BODY_BYTES + 1];
+        assertEquals(413, post(big, "repo:push", sign(big)).statusCode());
+        assertNull(RECEIVED.poll(500, TimeUnit.MILLISECONDS));
+    }
 }

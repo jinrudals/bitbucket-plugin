@@ -82,6 +82,24 @@ class BitbucketTriggerTest {
     }
 
     @Test
+    void differentCommitsQueuedWhileBlockedAreNotFolded(JenkinsRule j) throws Exception {
+        j.jenkins.setNumExecutors(0);
+        FreeStyleProject p = j.createFreeStyleProject();
+        BitbucketTrigger t = new BitbucketTrigger();
+        t.start(p, false);
+        assertTrue(t.fire(push("main", "h1")));
+        assertTrue(t.fire(push("main", "h2")));
+        hudson.model.Queue.Item[] items = j.jenkins.getQueue().getItems();
+        assertEquals(2, items.length);
+        java.util.Set<String> hashes = new java.util.HashSet<>();
+        for (hudson.model.Queue.Item i : items) {
+            hashes.add(i.getAction(BitbucketBuildAction.class).getCommitHash());
+        }
+        assertEquals(java.util.Set.of("h1", "h2"), hashes);
+        j.jenkins.getQueue().clear();
+    }
+
+    @Test
     void envVarsExported(JenkinsRule j) throws Exception {
         FreeStyleProject p = j.createFreeStyleProject();
         CaptureEnvironmentBuilder capture = new CaptureEnvironmentBuilder();

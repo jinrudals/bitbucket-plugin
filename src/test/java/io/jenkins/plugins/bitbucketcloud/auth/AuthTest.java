@@ -117,4 +117,14 @@ class AuthTest {
         assertEquals(Optional.empty(), AuthResolver.resolve("nope"));
         assertEquals(Optional.empty(), AuthResolver.resolve(null));
     }
+
+    @Test
+    void webhookSecretCredentialNeverUsedAsApiCredential(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("t")));
+        assertInstanceOf(BearerAuth.class, AuthResolver.resolve("wh").orElseThrow());
+        io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
+        assertEquals(Optional.empty(), AuthResolver.resolve("wh"));
+    }
 }

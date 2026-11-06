@@ -6,6 +6,7 @@ import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.security.ACL;
+import io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig;
 import java.util.Optional;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
@@ -15,6 +16,9 @@ public final class AuthResolver {
 
     public static Optional<BitbucketAuth> resolve(String credentialsId) {
         if (credentialsId == null || credentialsId.isBlank()) {
+            return Optional.empty();
+        }
+        if (credentialsId.equals(BitbucketGlobalConfig.get().getWebhookSecretId())) {
             return Optional.empty();
         }
         StandardCredentials c = CredentialsMatchers.firstOrNull(

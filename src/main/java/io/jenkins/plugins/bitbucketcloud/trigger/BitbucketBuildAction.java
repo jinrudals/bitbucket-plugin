@@ -1,14 +1,19 @@
 package io.jenkins.plugins.bitbucketcloud.trigger;
 
 import hudson.EnvVars;
+import hudson.Util;
 import hudson.model.EnvironmentContributingAction;
+import hudson.model.Action;
 import hudson.model.InvisibleAction;
+import hudson.model.Queue;
 import hudson.model.Run;
 import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
 import io.jenkins.plugins.bitbucketcloud.event.PullRequestEvent;
 import io.jenkins.plugins.bitbucketcloud.event.PushEvent;
+import java.util.List;
+import java.util.Objects;
 
-public class BitbucketBuildAction extends InvisibleAction implements EnvironmentContributingAction {
+public class BitbucketBuildAction extends InvisibleAction implements EnvironmentContributingAction, Queue.QueueAction {
 
     private final String repoFullName;
     private final String commitHash;
@@ -58,6 +63,17 @@ public class BitbucketBuildAction extends InvisibleAction implements Environment
 
     public String getActor() {
         return actor;
+    }
+
+    /** Folds into an already-queued item only when it is for the same commit and pull request. */
+    @Override
+    public boolean shouldSchedule(List<Action> actions) {
+        for (BitbucketBuildAction existing : Util.filter(actions, BitbucketBuildAction.class)) {
+            if (Objects.equals(existing.commitHash, commitHash) && Objects.equals(existing.prId, prId)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
