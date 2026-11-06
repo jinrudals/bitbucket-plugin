@@ -18,9 +18,11 @@ import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
 import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
 import io.jenkins.plugins.bitbucketcloud.event.PullRequestEvent;
 import io.jenkins.plugins.bitbucketcloud.event.PushEvent;
+import io.jenkins.plugins.bitbucketcloud.routing.RepoKey;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import jenkins.model.ParameterizedJobMixIn;
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
@@ -45,6 +47,7 @@ public class BitbucketTrigger extends Trigger<Job<?, ?>> {
     private volatile boolean allowForkPullRequests;
     private volatile boolean skipDuplicateCommit = true;
     private String credentialsId;
+    private String repository;
 
     private transient Map<String, Boolean> recentCommits;
 
@@ -148,6 +151,31 @@ public class BitbucketTrigger extends Trigger<Job<?, ?>> {
     @DataBoundSetter
     public void setCredentialsId(String credentialsId) {
         this.credentialsId = credentialsId == null || credentialsId.isBlank() ? null : credentialsId;
+    }
+
+    public String getRepository() {
+        return repository;
+    }
+
+    @DataBoundSetter
+    public void setRepository(String repository) {
+        this.repository = repository == null || repository.isBlank() ? null : repository.trim();
+    }
+
+    /** The explicitly configured repository, or empty when the job's Git remotes decide. */
+    public Optional<RepoKey> explicitRepository() {
+        if (repository == null) {
+            return Optional.empty();
+        }
+        Optional<RepoKey> fromUrl = RepoKey.fromUrl(repository);
+        if (fromUrl.isPresent()) {
+            return fromUrl;
+        }
+        try {
+            return Optional.of(RepoKey.fromFullName(repository));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     public Job<?, ?> getJob() {

@@ -65,6 +65,34 @@ class JobMatcherTest {
     }
 
     @Test
+    void matchesInlinePipelineByExplicitRepository(JenkinsRule j) throws Exception {
+        WorkflowJob byName = j.createProject(WorkflowJob.class, "inline-name");
+        BitbucketTrigger t1 = new BitbucketTrigger();
+        t1.setRepository("WS/Repo");
+        byName.addTrigger(t1);
+        WorkflowJob byUrl = j.createProject(WorkflowJob.class, "inline-url");
+        BitbucketTrigger t2 = new BitbucketTrigger();
+        t2.setRepository(URL);
+        byUrl.addTrigger(t2);
+        WorkflowJob other = j.createProject(WorkflowJob.class, "inline-other");
+        BitbucketTrigger t3 = new BitbucketTrigger();
+        t3.setRepository("ws/other");
+        other.addTrigger(t3);
+        WorkflowJob unset = j.createProject(WorkflowJob.class, "inline-unset");
+        unset.addTrigger(new BitbucketTrigger());
+        assertEquals(List.of(t1, t2), JobMatcher.findTriggers(new RepoKey("ws", "repo")));
+    }
+
+    @Test
+    void explicitRepositoryOverridesScmUrl(JenkinsRule j) throws Exception {
+        BitbucketTrigger t = new BitbucketTrigger();
+        t.setRepository("ws/elsewhere");
+        freestyle(j, "explicit", URL, t);
+        assertTrue(JobMatcher.findTriggers(new RepoKey("ws", "repo")).isEmpty());
+        assertEquals(List.of(t), JobMatcher.findTriggers(new RepoKey("ws", "elsewhere")));
+    }
+
+    @Test
     void throwingTriggerDoesNotStopOthers(JenkinsRule j) throws Exception {
         BitbucketTrigger bad = new ThrowingTrigger();
         freestyle(j, "a-bad", URL, bad);

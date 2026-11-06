@@ -1,5 +1,8 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
+  <f:entry title="Repository" field="repository">
+    <f:textbox/>
+  </f:entry>
   <f:entry title="Push events" field="pushEvents">
     <f:checkbox default="true"/>
   </f:entry>
