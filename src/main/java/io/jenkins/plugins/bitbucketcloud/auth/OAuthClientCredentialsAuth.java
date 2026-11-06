@@ -1,5 +1,6 @@
 package io.jenkins.plugins.bitbucketcloud.auth;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hudson.util.Secret;
@@ -67,7 +68,13 @@ public final class OAuthClientCredentialsAuth implements BitbucketAuth {
             if (res.statusCode() / 100 != 2) {
                 throw new IllegalStateException("OAuth token request failed with HTTP " + res.statusCode());
             }
-            JsonNode json = MAPPER.readTree(res.body());
+            JsonNode json;
+            try {
+                json = MAPPER.readTree(res.body());
+            } catch (JsonProcessingException e) {
+                // Jackson's message and cause can quote fragments of the response body
+                throw new IllegalStateException("OAuth token response was not valid JSON");
+            }
             String t = json.path("access_token").asText(null);
             if (t == null || t.isEmpty()) {
                 throw new IllegalStateException("OAuth token response had no access_token");

@@ -63,6 +63,36 @@ class AuthTest {
         verify(3, postRequestedFor(urlEqualTo("/token")));
     }
 
+    private void assertFailsAndNotCached(WireMockRuntimeInfo wm, String body, int status) {
+        stubFor(post("/token").willReturn(aResponse().withStatus(status).withBody(body)));
+        OAuthClientCredentialsAuth a = new OAuthClientCredentialsAuth(
+                "id", Secret.fromString("topsecret"), URI.create(wm.getHttpBaseUrl() + "/token"), new MutableClock());
+        for (int i = 1; i <= 2; i++) {
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> header(a));
+            for (Throwable t = ex; t != null; t = t.getCause()) {
+                String m = String.valueOf(t.getMessage());
+                assertFalse(m.contains("topsecret"), m);
+                assertFalse(m.contains("LEAKMARKER"), m);
+            }
+            verify(i, postRequestedFor(urlEqualTo("/token")));
+        }
+    }
+
+    @Test
+    void oauthServerErrorFailsAndIsNotCached(WireMockRuntimeInfo wm) {
+        assertFailsAndNotCached(wm, "LEAKMARKER", 500);
+    }
+
+    @Test
+    void oauthMalformedJsonFailsWithoutLeakingBody(WireMockRuntimeInfo wm) {
+        assertFailsAndNotCached(wm, "LEAKMARKER{bad", 200);
+    }
+
+    @Test
+    void oauthMissingAccessTokenFails(WireMockRuntimeInfo wm) {
+        assertFailsAndNotCached(wm, "{}", 200);
+    }
+
     @Test
     void resolverMapsTypes(JenkinsRule j) throws Exception {
         var store = SystemCredentialsProvider.getInstance().getCredentials();
