@@ -1,0 +1,20 @@
+# Maven
+target/
+work/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+
+# Git worktrees
+.worktrees/
+
+# Logs
+*.log
