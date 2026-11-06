@@ -92,4 +92,13 @@ class EventParserTest {
     void missingRepositoryThrowsInvalidPayload() {
         assertThrows(InvalidPayloadException.class, () -> EventParser.parse("repo:push", "{\"push\":{\"changes\":[]}}"));
     }
+
+    @Test
+    void treatsMissingSourceRepositoryAsFork() throws IOException {
+        String payload = fixture("pr-created")
+                .replace(",\"repository\":{\"full_name\":\"acme/app\"}},\"destination\"", "},\"destination\"");
+        assertFalse(payload.contains("\"source\":{\"branch\":{\"name\":\"feature/x\"},\"commit\":{\"hash\":\"fff999\"},\"repository\""));
+        PullRequestEvent event = (PullRequestEvent) EventParser.parse("pullrequest:created", payload).get(0);
+        assertTrue(event.fromFork());
+    }
 }

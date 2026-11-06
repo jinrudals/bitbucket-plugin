@@ -74,7 +74,8 @@ public final class EventParser {
         }
         String sourceRepo = text(source.path("repository").path("full_name"));
         String destRepo = text(destination.path("repository").path("full_name"));
-        boolean fromFork = sourceRepo != null && destRepo != null && !sourceRepo.equals(destRepo);
+        // A missing repository (e.g. deleted source fork) must not be treated as trusted.
+        boolean fromFork = sourceRepo == null || destRepo == null || !sourceRepo.equals(destRepo);
         return new PullRequestEvent(
                 repo, actor, type, id, sourceBranch, targetBranch, hash, pr.path("draft").asBoolean(false), fromFork);
     }
