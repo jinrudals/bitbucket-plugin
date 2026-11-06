@@ -1,0 +1,1 @@
+{"pullrequest":{"id":8,"draft":true,"source":{"branch":{"name":"feature/x"},"commit":{"hash":"fff999"},"repository":{"full_name":"acme/app"}},"destination":{"branch":{"name":"main"},"repository":{"full_name":"acme/app"}}},"repository":{"type":"repository","full_name":"acme/app","name":"app"},"actor":{"display_name":"Jane Doe","nickname":"jane"}}
