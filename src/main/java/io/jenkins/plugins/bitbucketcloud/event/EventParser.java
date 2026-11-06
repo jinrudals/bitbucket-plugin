@@ -77,7 +77,15 @@ public final class EventParser {
         // A missing repository (e.g. deleted source fork) must not be treated as trusted.
         boolean fromFork = sourceRepo == null || destRepo == null || !sourceRepo.equals(destRepo);
         return new PullRequestEvent(
-                repo, actor, type, id, sourceBranch, targetBranch, hash, pr.path("draft").asBoolean(false), fromFork);
+                repo,
+                actor,
+                type,
+                id,
+                sourceBranch,
+                targetBranch,
+                hash,
+                pr.path("draft").asBoolean(false),
+                fromFork);
     }
 
     private static String actor(JsonNode actor) {

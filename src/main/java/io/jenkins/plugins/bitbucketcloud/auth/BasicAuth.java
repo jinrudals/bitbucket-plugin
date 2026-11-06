@@ -17,6 +17,7 @@ public final class BasicAuth implements BitbucketAuth {
     @Override
     public void applyTo(HttpRequest.Builder b) {
         String raw = user + ":" + password.getPlainText();
-        b.setHeader("Authorization", "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8)));
+        b.setHeader(
+                "Authorization", "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8)));
     }
 }

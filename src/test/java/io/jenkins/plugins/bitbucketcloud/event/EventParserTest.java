@@ -55,7 +55,8 @@ class EventParserTest {
     void parsesPullRequestCreatedAndUpdated() throws IOException {
         PullRequestEvent created = pr("pullrequest:created", "pr-created");
         assertEquals(
-                new PullRequestEvent("acme/app", "Jane Doe", "created", "7", "feature/x", "main", "fff999", false, false),
+                new PullRequestEvent(
+                        "acme/app", "Jane Doe", "created", "7", "feature/x", "main", "fff999", false, false),
                 created);
         assertEquals("updated", pr("pullrequest:updated", "pr-updated").type());
     }
@@ -73,8 +74,9 @@ class EventParserTest {
 
     @Test
     void fallsBackToNicknameWhenNoDisplayName() {
-        String body = "{\"push\":{\"changes\":[{\"new\":{\"type\":\"branch\",\"name\":\"m\",\"target\":{\"hash\":\"h\"}}}]},"
-                + "\"repository\":{\"full_name\":\"a/b\"},\"actor\":{\"nickname\":\"jane\"}}";
+        String body =
+                "{\"push\":{\"changes\":[{\"new\":{\"type\":\"branch\",\"name\":\"m\",\"target\":{\"hash\":\"h\"}}}]},"
+                        + "\"repository\":{\"full_name\":\"a/b\"},\"actor\":{\"nickname\":\"jane\"}}";
         assertEquals("jane", EventParser.parse("repo:push", body).get(0).actor());
     }
 
@@ -90,15 +92,18 @@ class EventParserTest {
 
     @Test
     void missingRepositoryThrowsInvalidPayload() {
-        assertThrows(InvalidPayloadException.class, () -> EventParser.parse("repo:push", "{\"push\":{\"changes\":[]}}"));
+        assertThrows(
+                InvalidPayloadException.class, () -> EventParser.parse("repo:push", "{\"push\":{\"changes\":[]}}"));
     }
 
     @Test
     void treatsMissingSourceRepositoryAsFork() throws IOException {
         String payload = fixture("pr-created")
                 .replace(",\"repository\":{\"full_name\":\"acme/app\"}},\"destination\"", "},\"destination\"");
-        assertFalse(payload.contains("\"source\":{\"branch\":{\"name\":\"feature/x\"},\"commit\":{\"hash\":\"fff999\"},\"repository\""));
-        PullRequestEvent event = (PullRequestEvent) EventParser.parse("pullrequest:created", payload).get(0);
+        assertFalse(payload.contains(
+                "\"source\":{\"branch\":{\"name\":\"feature/x\"},\"commit\":{\"hash\":\"fff999\"},\"repository\""));
+        PullRequestEvent event = (PullRequestEvent)
+                EventParser.parse("pullrequest:created", payload).get(0);
         assertTrue(event.fromFork());
     }
 }

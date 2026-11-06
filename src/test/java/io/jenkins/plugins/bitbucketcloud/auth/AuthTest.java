@@ -34,9 +34,18 @@ class AuthTest {
 
     static class MutableClock extends Clock {
         final AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-01-01T00:00:00Z"));
-        public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
-        public Clock withZone(java.time.ZoneId z) { return this; }
-        public Instant instant() { return now.get(); }
+
+        public java.time.ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        public Clock withZone(java.time.ZoneId z) {
+            return this;
+        }
+
+        public Instant instant() {
+            return now.get();
+        }
     }
 
     @Test
@@ -53,9 +62,11 @@ class AuthTest {
                 "id", Secret.fromString("sec"), URI.create(wm.getHttpBaseUrl() + "/token"), clock);
         assertEquals("Bearer T1", header(a));
         assertEquals("Bearer T1", header(a));
-        verify(1, postRequestedFor(urlEqualTo("/token"))
-                .withRequestBody(containing("grant_type=client_credentials"))
-                .withHeader("Authorization", equalTo("Basic aWQ6c2Vj")));
+        verify(
+                1,
+                postRequestedFor(urlEqualTo("/token"))
+                        .withRequestBody(containing("grant_type=client_credentials"))
+                        .withHeader("Authorization", equalTo("Basic aWQ6c2Vj")));
         clock.now.set(clock.now.get().plus(Duration.ofSeconds(3541)));
         header(a);
         verify(2, postRequestedFor(urlEqualTo("/token")));
@@ -101,7 +112,8 @@ class AuthTest {
         store.add(new BitbucketOAuthCredentials(CredentialsScope.GLOBAL, "oa", "d", "cid", Secret.fromString("cs")));
         assertInstanceOf(BasicAuth.class, AuthResolver.resolve("up").orElseThrow());
         assertInstanceOf(BearerAuth.class, AuthResolver.resolve("str").orElseThrow());
-        assertInstanceOf(OAuthClientCredentialsAuth.class, AuthResolver.resolve("oa").orElseThrow());
+        assertInstanceOf(
+                OAuthClientCredentialsAuth.class, AuthResolver.resolve("oa").orElseThrow());
         assertEquals(Optional.empty(), AuthResolver.resolve("nope"));
         assertEquals(Optional.empty(), AuthResolver.resolve(null));
     }

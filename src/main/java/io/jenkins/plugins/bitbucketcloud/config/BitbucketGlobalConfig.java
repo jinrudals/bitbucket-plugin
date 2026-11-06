@@ -10,12 +10,12 @@ import hudson.Extension;
 import hudson.security.ACL;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
-import java.net.URI;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
 import org.jenkinsci.Symbol;
@@ -89,7 +89,9 @@ public class BitbucketGlobalConfig extends GlobalConfiguration {
             if (uri != null && (isHttps(uri) || isLocal(uri))) {
                 this.apiBaseUrl = candidate;
             } else {
-                LOGGER.log(Level.WARNING, "Rejecting invalid Bitbucket API base URL {0}; using default",
+                LOGGER.log(
+                        Level.WARNING,
+                        "Rejecting invalid Bitbucket API base URL {0}; using default",
                         describe(candidate, uri));
                 this.apiBaseUrl = DEFAULT_API_BASE_URL;
             }

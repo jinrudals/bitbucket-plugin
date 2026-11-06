@@ -46,12 +46,16 @@ public final class BitbucketClient {
         try {
             doPost(repo, commitHash, status);
         } catch (RuntimeException e) {
-            LOGGER.log(Level.WARNING, "Failed to post Bitbucket commit status: {0}", e.getClass().getSimpleName());
+            LOGGER.log(
+                    Level.WARNING,
+                    "Failed to post Bitbucket commit status: {0}",
+                    e.getClass().getSimpleName());
         }
     }
 
     private void doPost(RepoKey repo, String commitHash, CommitStatus status) {
-        if (commitHash == null || !HEX.matcher(commitHash).matches()
+        if (commitHash == null
+                || !HEX.matcher(commitHash).matches()
                 || !SAFE_SEGMENT.matcher(repo.workspace()).matches()
                 || !SAFE_SEGMENT.matcher(repo.slug()).matches()) {
             LOGGER.log(Level.WARNING, "Skipping commit status: invalid repository or commit hash");
@@ -71,7 +75,8 @@ public final class BitbucketClient {
             auth.applyTo(b);
             int code;
             try {
-                code = http.send(b.build(), HttpResponse.BodyHandlers.discarding()).statusCode();
+                code = http.send(b.build(), HttpResponse.BodyHandlers.discarding())
+                        .statusCode();
             } catch (IOException e) {
                 if (!backoff(retries++, "I/O error " + e.getClass().getSimpleName())) {
                     return;
@@ -116,8 +121,8 @@ public final class BitbucketClient {
     }
 
     private static String toJson(CommitStatus s) {
-        return "{\"key\":" + q(s.key()) + ",\"name\":" + q(s.name()) + ",\"state\":" + q(s.state())
-                + ",\"url\":" + q(s.url()) + ",\"description\":" + q(s.description()) + "}";
+        return "{\"key\":" + q(s.key()) + ",\"name\":" + q(s.name()) + ",\"state\":" + q(s.state()) + ",\"url\":"
+                + q(s.url()) + ",\"description\":" + q(s.description()) + "}";
     }
 
     private static String q(String v) {

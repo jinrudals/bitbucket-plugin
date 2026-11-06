@@ -24,7 +24,8 @@ public final class OAuthClientCredentialsAuth implements BitbucketAuth {
     private final Secret clientSecret;
     private final URI tokenEndpoint;
     private final Clock clock;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient http =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
     private String token;
     private Instant validUntil = Instant.MIN;
@@ -83,7 +84,8 @@ public final class OAuthClientCredentialsAuth implements BitbucketAuth {
             token = t;
             validUntil = clock.instant().plusSeconds(expiresIn).minus(SKEW);
         } catch (IOException e) {
-            throw new IllegalStateException("OAuth token request failed: " + e.getClass().getSimpleName(), e);
+            throw new IllegalStateException(
+                    "OAuth token request failed: " + e.getClass().getSimpleName(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while requesting OAuth token", e);

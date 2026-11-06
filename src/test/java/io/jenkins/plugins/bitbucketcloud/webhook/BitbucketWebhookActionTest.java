@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
-import hudson.Extension;
 import hudson.security.csrf.DefaultCrumbIssuer;
 import hudson.util.Secret;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig;

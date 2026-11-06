@@ -10,11 +10,11 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
 import java.util.List;
-import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
+import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 
 @WithJenkins
@@ -32,10 +32,12 @@ class BitbucketGlobalConfigTest {
 
     @Test
     void roundTrip(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance().getCredentials().add(
-                new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s3cret")));
-        SystemCredentialsProvider.getInstance().getCredentials().add(
-                new StringCredentialsImpl(CredentialsScope.GLOBAL, "tok", "d", Secret.fromString("t")));
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s3cret")));
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "tok", "d", Secret.fromString("t")));
         BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
         c.setWebhookSecretId("wh");
         c.setDefaultCredentialsId("tok");
@@ -57,7 +59,8 @@ class BitbucketGlobalConfigTest {
             c.setApiBaseUrl(bad);
             assertEquals("https://api.bitbucket.org", c.getApiBaseUrl(), bad);
         }
-        for (String ok : new String[] {"http://localhost:1", "http://127.0.0.1:2", "http://[::1]:3", "https://example.org"}) {
+        for (String ok :
+                new String[] {"http://localhost:1", "http://127.0.0.1:2", "http://[::1]:3", "https://example.org"}) {
             c.setApiBaseUrl(ok);
             assertEquals(ok, c.getApiBaseUrl());
         }
@@ -75,9 +78,12 @@ class BitbucketGlobalConfigTest {
 
     @Test
     void webhookSecretResolvesWhenScopedToBitbucketDomain(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance().getDomainCredentialsMap().put(
-                new Domain("bb", null, List.of(new HostnameSpecification("bitbucket.org", null))),
-                List.of(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s3cret"))));
+        SystemCredentialsProvider.getInstance()
+                .getDomainCredentialsMap()
+                .put(
+                        new Domain("bb", null, List.of(new HostnameSpecification("bitbucket.org", null))),
+                        List.of(new StringCredentialsImpl(
+                                CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s3cret"))));
         BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
         c.setWebhookSecretId("wh");
         assertEquals("s3cret", c.webhookSecret().orElseThrow());
@@ -87,18 +93,25 @@ class BitbucketGlobalConfigTest {
 
     @Test
     void fillMethodsAdminVsNonAdmin(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance().getCredentials().add(
-                new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s")));
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s")));
         j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
         j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
-                .grant(Jenkins.ADMINISTER).everywhere().to("admin")
-                .grant(Jenkins.READ).everywhere().to("user"));
+                .grant(Jenkins.ADMINISTER)
+                .everywhere()
+                .to("admin")
+                .grant(Jenkins.READ)
+                .everywhere()
+                .to("user"));
         BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
-        try (var ctx = hudson.security.ACL.as2(hudson.model.User.getOrCreateByIdOrFullName("admin").impersonate2())) {
+        try (var ctx = hudson.security.ACL.as2(
+                hudson.model.User.getOrCreateByIdOrFullName("admin").impersonate2())) {
             ListBoxModel m = c.doFillWebhookSecretIdItems(null);
             assertTrue(m.stream().anyMatch(o -> "wh".equals(o.value)));
         }
-        try (var ctx = hudson.security.ACL.as2(hudson.model.User.getOrCreateByIdOrFullName("user").impersonate2())) {
+        try (var ctx = hudson.security.ACL.as2(
+                hudson.model.User.getOrCreateByIdOrFullName("user").impersonate2())) {
             ListBoxModel m = c.doFillWebhookSecretIdItems("cur");
             assertEquals(1, m.size());
             assertEquals("cur", m.get(0).value);

@@ -20,8 +20,7 @@ import org.junit.jupiter.api.Test;
 class BitbucketClientTest {
     private static final String PATH = "/2.0/repositories/ws/repo/commit/abc123/statuses/build";
     private static final RepoKey REPO = new RepoKey("ws", "repo");
-    private static final CommitStatus STATUS =
-            new CommitStatus("job-1", "job #1", "SUCCESSFUL", "http://j/1", "done");
+    private static final CommitStatus STATUS = new CommitStatus("job-1", "job #1", "SUCCESSFUL", "http://j/1", "done");
 
     private final List<Duration> sleeps = new ArrayList<>();
 
@@ -53,20 +52,31 @@ class BitbucketClientTest {
     void sendsExpectedRequest(WireMockRuntimeInfo wm) {
         stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(201)));
         client(wm, new TestAuth()).postCommitStatus(REPO, "abc123", STATUS);
-        verify(1, postRequestedFor(urlEqualTo(PATH))
-                .withHeader("Authorization", equalTo("Bearer t1"))
-                .withHeader("Content-Type", containing("application/json"))
-                .withRequestBody(equalToJson(
-                        "{\"key\":\"job-1\",\"name\":\"job #1\",\"state\":\"SUCCESSFUL\",\"url\":\"http://j/1\",\"description\":\"done\"}")));
+        verify(
+                1,
+                postRequestedFor(urlEqualTo(PATH))
+                        .withHeader("Authorization", equalTo("Bearer t1"))
+                        .withHeader("Content-Type", containing("application/json"))
+                        .withRequestBody(
+                                equalToJson(
+                                        "{\"key\":\"job-1\",\"name\":\"job #1\",\"state\":\"SUCCESSFUL\",\"url\":\"http://j/1\",\"description\":\"done\"}")));
     }
 
     @Test
     void retriesServerErrorsThenSucceeds(WireMockRuntimeInfo wm) {
-        stubFor(post(urlEqualTo(PATH)).inScenario("s").whenScenarioStateIs(Scenario.STARTED)
-                .willReturn(aResponse().withStatus(500)).willSetStateTo("2"));
-        stubFor(post(urlEqualTo(PATH)).inScenario("s").whenScenarioStateIs("2")
-                .willReturn(aResponse().withStatus(500)).willSetStateTo("3"));
-        stubFor(post(urlEqualTo(PATH)).inScenario("s").whenScenarioStateIs("3")
+        stubFor(post(urlEqualTo(PATH))
+                .inScenario("s")
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("2"));
+        stubFor(post(urlEqualTo(PATH))
+                .inScenario("s")
+                .whenScenarioStateIs("2")
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("3"));
+        stubFor(post(urlEqualTo(PATH))
+                .inScenario("s")
+                .whenScenarioStateIs("3")
                 .willReturn(aResponse().withStatus(200)));
         client(wm, new TestAuth()).postCommitStatus(REPO, "abc123", STATUS);
         verify(3, postRequestedFor(urlEqualTo(PATH)));
@@ -98,9 +108,11 @@ class BitbucketClientTest {
 
     @Test
     void unauthorizedWithRefreshRetriesOnceWithNewToken(WireMockRuntimeInfo wm) {
-        stubFor(post(urlEqualTo(PATH)).withHeader("Authorization", equalTo("Bearer t1"))
+        stubFor(post(urlEqualTo(PATH))
+                .withHeader("Authorization", equalTo("Bearer t1"))
                 .willReturn(aResponse().withStatus(401)));
-        stubFor(post(urlEqualTo(PATH)).withHeader("Authorization", equalTo("Bearer t2"))
+        stubFor(post(urlEqualTo(PATH))
+                .withHeader("Authorization", equalTo("Bearer t2"))
                 .willReturn(aResponse().withStatus(200)));
         TestAuth auth = new TestAuth();
         auth.refreshable = true;
