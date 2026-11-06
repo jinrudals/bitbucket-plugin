@@ -1,0 +1,36 @@
+package io.jenkins.plugins.bitbucketcloud.routing;
+
+import hudson.Extension;
+import hudson.model.Job;
+import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
+import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
+import io.jenkins.plugins.bitbucketcloud.webhook.EventDispatcher;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+@Extension
+public class TriggerEventDispatcher implements EventDispatcher {
+
+    private static final Logger LOGGER = Logger.getLogger(TriggerEventDispatcher.class.getName());
+
+    @Override
+    public void dispatch(BitbucketEvent e) {
+        RepoKey repo;
+        try {
+            repo = RepoKey.fromFullName(e.repoFullName());
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
+            return;
+        }
+        for (BitbucketTrigger trigger : JobMatcher.findTriggers(repo)) {
+            try {
+                if (trigger.accepts(e)) {
+                    trigger.fire(e);
+                }
+            } catch (Exception ex) {
+                Job<?, ?> job = trigger.getJob();
+                LOGGER.log(Level.WARNING, "Failed to trigger " + (job == null ? "?" : job.getFullName()), ex);
+            }
+        }
+    }
+}

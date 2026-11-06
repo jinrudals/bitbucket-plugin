@@ -150,6 +150,10 @@ public class BitbucketTrigger extends Trigger<Job<?, ?>> {
         this.credentialsId = credentialsId == null || credentialsId.isBlank() ? null : credentialsId;
     }
 
+    public Job<?, ?> getJob() {
+        return job;
+    }
+
     public boolean accepts(BitbucketEvent e) {
         if (e instanceof PushEvent p) {
             return pushEvents && new BranchFilter(sourceBranchIncludes, sourceBranchExcludes).matches(p.branch());
