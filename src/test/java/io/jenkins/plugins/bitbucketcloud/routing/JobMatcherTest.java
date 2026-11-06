@@ -10,7 +10,13 @@ import hudson.triggers.TriggerDescriptor;
 import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
 import io.jenkins.plugins.bitbucketcloud.event.PushEvent;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
+import hudson.security.ACL;
 import java.util.List;
+import org.jvnet.hudson.test.MockAuthorizationStrategy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
@@ -74,6 +80,38 @@ class JobMatcherTest {
         new TriggerEventDispatcher().dispatch(new PushEvent("nonsense", "me", "main", "abc"));
         j.waitUntilNoActivity();
         assertTrue(p.getBuilds().isEmpty());
+    }
+
+    @Test
+    void dispatchFiresUnderSystemWhenCallerIsAnonymous(JenkinsRule j) throws Exception {
+        AuthRecordingTrigger trigger = new AuthRecordingTrigger();
+        FreeStyleProject p = freestyle(j, "hidden", URL, trigger);
+        j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
+        j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy());
+        Authentication anon = new AnonymousAuthenticationToken(
+                "anonymous", "anonymous", AuthorityUtils.createAuthorityList("anonymous"));
+        try (var ignored = ACL.as2(anon)) {
+            assertEquals(anon, SecurityContextHolder.getContext().getAuthentication());
+            new TriggerEventDispatcher().dispatch(new PushEvent("ws/repo", "me", "main", "abc"));
+        }
+        j.waitUntilNoActivity();
+        assertEquals(2, p.getNextBuildNumber());
+        assertEquals(ACL.SYSTEM2, trigger.acceptsAuth);
+    }
+
+    public static class AuthRecordingTrigger extends BitbucketTrigger {
+        Authentication acceptsAuth;
+
+        @Override
+        public boolean accepts(BitbucketEvent e) {
+            acceptsAuth = SecurityContextHolder.getContext().getAuthentication();
+            return super.accepts(e);
+        }
+
+        @Override
+        public TriggerDescriptor getDescriptor() {
+            return Jenkins.get().getDescriptorByType(BitbucketTrigger.DescriptorImpl.class);
+        }
     }
 
     public static class ThrowingTrigger extends BitbucketTrigger {

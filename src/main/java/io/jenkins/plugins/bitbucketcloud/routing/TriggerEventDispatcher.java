@@ -2,6 +2,7 @@ package io.jenkins.plugins.bitbucketcloud.routing;
 
 import hudson.Extension;
 import hudson.model.Job;
+import hudson.security.ACL;
 import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
 import io.jenkins.plugins.bitbucketcloud.webhook.EventDispatcher;
@@ -22,14 +23,16 @@ public class TriggerEventDispatcher implements EventDispatcher {
             LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
             return;
         }
-        for (BitbucketTrigger trigger : JobMatcher.findTriggers(repo)) {
-            try {
-                if (trigger.accepts(e)) {
-                    trigger.fire(e);
+        try (var ignored = ACL.as2(ACL.SYSTEM2)) {
+            for (BitbucketTrigger trigger : JobMatcher.findTriggers(repo)) {
+                try {
+                    if (trigger.accepts(e)) {
+                        trigger.fire(e);
+                    }
+                } catch (Exception ex) {
+                    Job<?, ?> job = trigger.getJob();
+                    LOGGER.log(Level.WARNING, "Failed to trigger " + (job == null ? "?" : job.getFullName()), ex);
                 }
-            } catch (Exception ex) {
-                Job<?, ?> job = trigger.getJob();
-                LOGGER.log(Level.WARNING, "Failed to trigger " + (job == null ? "?" : job.getFullName()), ex);
             }
         }
     }
