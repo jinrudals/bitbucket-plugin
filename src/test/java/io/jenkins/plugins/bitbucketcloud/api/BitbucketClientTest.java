@@ -148,6 +148,29 @@ class BitbucketClientTest {
     }
 
     @Test
+    void unsafePathSegmentsAreSkipped(WireMockRuntimeInfo wm) {
+        BitbucketClient c = client(wm, new TestAuth());
+        c.postCommitStatus(new RepoKey("..", ".."), "abc123", STATUS);
+        c.postCommitStatus(new RepoKey(".", "repo"), "abc123", STATUS);
+        c.postCommitStatus(new RepoKey("ws", ".."), "abc123", STATUS);
+        c.postCommitStatus(new RepoKey("ws", "a/b"), "abc123", STATUS);
+        c.postCommitStatus(new RepoKey("ws", "a%2fb"), "abc123", STATUS);
+        verify(0, postRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void specialCharactersAreEscapedAndRoundTrip(WireMockRuntimeInfo wm) throws Exception {
+        stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(201)));
+        String tricky = "a\"b\\c\n\u0001\u00e9\ud55c";
+        client(wm, new TestAuth())
+                .postCommitStatus(REPO, "abc123", new CommitStatus("k", tricky, "SUCCESSFUL", "http://j/1", tricky));
+        String body = findAll(postRequestedFor(urlEqualTo(PATH))).get(0).getBodyAsString();
+        com.fasterxml.jackson.databind.JsonNode n = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        assertEquals(tricky, n.get("name").asText());
+        assertEquals(tricky, n.get("description").asText());
+    }
+
+    @Test
     void interruptStopsRetryAndRestoresFlag(WireMockRuntimeInfo wm) {
         stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(500)));
         BitbucketClient c = new BitbucketClient(URI.create(wm.getHttpBaseUrl()), new TestAuth(), d -> {

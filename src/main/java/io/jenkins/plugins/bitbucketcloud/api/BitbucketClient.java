@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 public final class BitbucketClient {
     private static final Logger LOGGER = Logger.getLogger(BitbucketClient.class.getName());
     private static final Pattern HEX = Pattern.compile("^[0-9a-fA-F]{4,64}$");
-    private static final Pattern SAFE_SEGMENT = Pattern.compile("^[A-Za-z0-9._~-]+$");
+    private static final Pattern SAFE_SEGMENT = Pattern.compile("^(?!\\.{1,2}$)[A-Za-z0-9._~-]+$");
     private static final int MAX_RETRIES = 3;
 
     public interface Sleeper {
