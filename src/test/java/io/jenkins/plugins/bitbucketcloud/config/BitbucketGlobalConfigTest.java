@@ -4,7 +4,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
+import com.cloudbees.plugins.credentials.domains.Domain;
+import com.cloudbees.plugins.credentials.domains.HostnameSpecification;
+import hudson.util.FormValidation;
+import hudson.util.ListBoxModel;
 import hudson.util.Secret;
+import java.util.List;
+import org.jvnet.hudson.test.MockAuthorizationStrategy;
+import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -41,5 +48,61 @@ class BitbucketGlobalConfigTest {
         assertTrue(c.isAllowUnsignedWebhooks());
         assertEquals("http://localhost:1234", c.getApiBaseUrl());
         assertEquals("s3cret", c.webhookSecret().orElseThrow());
+    }
+
+    @Test
+    void invalidApiBaseUrlFallsBackToDefault(JenkinsRule j) {
+        BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
+        for (String bad : new String[] {"http://evil.example.com", "not a url", "https://", "ftp://x.org"}) {
+            c.setApiBaseUrl(bad);
+            assertEquals("https://api.bitbucket.org", c.getApiBaseUrl(), bad);
+        }
+        for (String ok : new String[] {"http://localhost:1", "http://127.0.0.1:2", "http://[::1]:3", "https://example.org"}) {
+            c.setApiBaseUrl(ok);
+            assertEquals(ok, c.getApiBaseUrl());
+        }
+    }
+
+    @Test
+    void checkApiBaseUrl(JenkinsRule j) {
+        BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
+        assertEquals(FormValidation.Kind.OK, c.doCheckApiBaseUrl("https://api.bitbucket.org").kind);
+        assertEquals(FormValidation.Kind.OK, c.doCheckApiBaseUrl("http://localhost:8080").kind);
+        assertEquals(FormValidation.Kind.WARNING, c.doCheckApiBaseUrl("http://example.com").kind);
+        assertEquals(FormValidation.Kind.ERROR, c.doCheckApiBaseUrl("not a url").kind);
+        assertEquals(FormValidation.Kind.ERROR, c.doCheckApiBaseUrl("https://").kind);
+    }
+
+    @Test
+    void webhookSecretResolvesWhenScopedToBitbucketDomain(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance().getDomainCredentialsMap().put(
+                new Domain("bb", null, List.of(new HostnameSpecification("bitbucket.org", null))),
+                List.of(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s3cret"))));
+        BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
+        c.setWebhookSecretId("wh");
+        assertEquals("s3cret", c.webhookSecret().orElseThrow());
+        ListBoxModel m = c.doFillWebhookSecretIdItems("wh");
+        assertTrue(m.stream().anyMatch(o -> "wh".equals(o.value)));
+    }
+
+    @Test
+    void fillMethodsAdminVsNonAdmin(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance().getCredentials().add(
+                new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("s")));
+        j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
+        j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
+                .grant(Jenkins.ADMINISTER).everywhere().to("admin")
+                .grant(Jenkins.READ).everywhere().to("user"));
+        BitbucketGlobalConfig c = BitbucketGlobalConfig.get();
+        try (var ctx = hudson.security.ACL.as2(hudson.model.User.getOrCreateByIdOrFullName("admin").impersonate2())) {
+            ListBoxModel m = c.doFillWebhookSecretIdItems(null);
+            assertTrue(m.stream().anyMatch(o -> "wh".equals(o.value)));
+        }
+        try (var ctx = hudson.security.ACL.as2(hudson.model.User.getOrCreateByIdOrFullName("user").impersonate2())) {
+            ListBoxModel m = c.doFillWebhookSecretIdItems("cur");
+            assertEquals(1, m.size());
+            assertEquals("cur", m.get(0).value);
+            assertEquals(1, c.doFillDefaultCredentialsIdItems("cur").size());
+        }
     }
 }
