@@ -17,6 +17,10 @@ import io.jenkins.plugins.bitbucketcloud.routing.RepoKey;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketBuildAction;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,7 +44,7 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
         String state;
         if (r == null || r == Result.SUCCESS || r == Result.UNSTABLE) {
             state = "SUCCESSFUL";
-        } else if (r == Result.ABORTED) {
+        } else if (r == Result.ABORTED || r == Result.NOT_BUILT) {
             state = "STOPPED";
         } else {
             state = "FAILED";
@@ -59,21 +63,34 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
                 return;
             }
             BitbucketGlobalConfig cfg = BitbucketGlobalConfig.get();
-            String key = "jenkins/" + run.getParent().getFullName();
-            if (key.length() > MAX_KEY) {
-                key = key.substring(0, MAX_KEY);
-            }
+            String fullName = run.getParent().getFullName();
+            String key = statusKey(fullName);
             String url = run.getAbsoluteUrl();
             new BitbucketClient(URI.create(cfg.getApiBaseUrl()), auth.get())
                     .postCommitStatus(
                             target.get().repo(),
                             target.get().commit(),
-                            new CommitStatus(key, run.getFullDisplayName(), state, url, description));
-        } catch (RuntimeException e) {
+                            new CommitStatus(key, "Jenkins: " + fullName, state, url, description));
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable e) {
             LOGGER.log(
                     Level.WARNING,
                     "Could not report build status to Bitbucket: {0}",
                     e.getClass().getSimpleName());
+        }
+    }
+
+    // Bitbucket limits keys to 40 chars; long names keep a prefix plus a SHA-1 suffix to stay unique.
+    static String statusKey(String fullName) {
+        if (fullName.length() <= MAX_KEY) {
+            return fullName;
+        }
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-1").digest(fullName.getBytes(StandardCharsets.UTF_8));
+            return fullName.substring(0, MAX_KEY - 9) + "-" + HexFormat.of().formatHex(d, 0, 4);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 

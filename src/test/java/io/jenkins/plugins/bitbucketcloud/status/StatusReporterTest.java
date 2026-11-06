@@ -2,6 +2,8 @@ package io.jenkins.plugins.bitbucketcloud.status;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
@@ -146,5 +148,59 @@ class StatusReporterTest {
         verify(
                 1,
                 postRequestedFor(urlEqualTo(PATH)).withRequestBody(matchingJsonPath("$.state", equalTo("SUCCESSFUL"))));
+    }
+
+    @Test
+    void shortKeyUntouchedAndLongKeyHashedDeterministically() {
+        assertEquals("team/service/main", StatusReporter.statusKey("team/service/main"));
+        String a = "team-platform/service-name-long/feature-x";
+        String b = "team-platform/service-name-long/feature-y";
+        assertTrue(a.length() > 40 && a.substring(0, 40).equals(b.substring(0, 40)));
+        String ka = StatusReporter.statusKey(a);
+        assertEquals(40, ka.length());
+        assertEquals(ka, StatusReporter.statusKey(a));
+        assertEquals(a.substring(0, 31) + "-", ka.substring(0, 32));
+        assertNotEquals(ka, StatusReporter.statusKey(b));
+        assertEquals("x".repeat(40), StatusReporter.statusKey("x".repeat(40)));
+    }
+
+    @Test
+    void keyIsJobNameAndNameHasNoBuildNumber(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        setup(j, wm, true);
+        run(project(j, false));
+        verify(
+                2,
+                postRequestedFor(urlEqualTo(PATH))
+                        .withRequestBody(matchingJsonPath("$.key", equalTo("job")))
+                        .withRequestBody(matchingJsonPath("$.name", equalTo("Jenkins: job"))));
+    }
+
+    @Test
+    void notBuiltMapsToStopped(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        setup(j, wm, true);
+        FreeStyleProject p = project(j, false);
+        p.getBuildersList().add(new org.jvnet.hudson.test.TestBuilder() {
+            @Override
+            public boolean perform(
+                    hudson.model.AbstractBuild<?, ?> build, hudson.Launcher l, hudson.model.BuildListener bl) {
+                build.setResult(Result.NOT_BUILT);
+                return true;
+            }
+        });
+        run(p);
+        verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(matchingJsonPath("$.state", equalTo("STOPPED"))));
+    }
+
+    @Test
+    void malformedRepoFullNameSkipsSilently(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        setup(j, wm, true);
+        FreeStyleProject p = project(j, false);
+        FreeStyleBuild b = p.scheduleBuild2(
+                        0,
+                        new hudson.model.Cause.UserIdCause(),
+                        new BitbucketBuildAction(new PushEvent("not-a-valid-name", "a", "main", HASH)))
+                .get();
+        assertEquals(Result.SUCCESS, b.getResult());
+        verify(0, postRequestedFor(urlEqualTo(PATH)));
     }
 }
