@@ -9,13 +9,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import jenkins.plugins.git.AbstractGitSCMSource;
+import jenkins.plugins.git.GitBranchSCMHead;
 import jenkins.plugins.git.GitSCMSource;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMHeadEvent;
 import jenkins.scm.api.SCMNavigator;
 import jenkins.scm.api.SCMRevision;
 import jenkins.scm.api.SCMSource;
-import jenkins.plugins.git.GitBranchSCMHead;
 
 /** Adapts a Bitbucket push / pull-request event to an scm-api head event for multibranch projects. */
 public class BitbucketHeadEvent extends SCMHeadEvent<BitbucketEvent> {
@@ -92,9 +92,8 @@ public class BitbucketHeadEvent extends SCMHeadEvent<BitbucketEvent> {
             return Collections.emptyMap();
         }
         SCMHead head = new GitBranchSCMHead(branch);
-        SCMRevision rev = e.commitHash() == null
-                ? null
-                : new AbstractGitSCMSource.SCMRevisionImpl(head, e.commitHash());
+        SCMRevision rev =
+                e.commitHash() == null ? null : new AbstractGitSCMSource.SCMRevisionImpl(head, e.commitHash());
         return Collections.singletonMap(head, rev);
     }
 }

@@ -63,8 +63,8 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
         }
         BitbucketGlobalConfig config = BitbucketGlobalConfig.get();
         Optional<String> secret = config.webhookSecret();
-        boolean verified = secret.isPresent()
-                && SignatureVerifier.verify(body, req.getHeader("X-Hub-Signature"), secret.get());
+        boolean verified =
+                secret.isPresent() && SignatureVerifier.verify(body, req.getHeader("X-Hub-Signature"), secret.get());
         // Unsigned webhooks are tolerated only when no secret is configured at all.
         if (!verified && (secret.isPresent() || !config.isAllowUnsignedWebhooks())) {
             LOGGER.log(Level.FINE, "Rejected webhook: signature missing/invalid or no secret configured");

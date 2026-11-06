@@ -153,10 +153,11 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
             return Optional.empty();
         }
         for (BuildData data : run.getActions(BuildData.class)) {
-            if (data.getLastBuiltRevision() == null || data.getRemoteUrls() == null) {
+            var revision = data.getLastBuiltRevision();
+            if (revision == null || data.getRemoteUrls() == null) {
                 continue;
             }
-            String sha = data.getLastBuiltRevision().getSha1String();
+            String sha = revision.getSha1String();
             for (String url : data.getRemoteUrls()) {
                 Optional<RepoKey> key = RepoKey.fromUrl(url);
                 if (key.isPresent()) {

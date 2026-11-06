@@ -34,16 +34,16 @@ public class BitbucketTrigger extends Trigger<Job<?, ?>> {
 
     private static final int DEDUPE_CAPACITY = 50;
 
-    private boolean pushEvents = true;
-    private boolean pullRequestCreated = true;
-    private boolean pullRequestUpdated = true;
+    private volatile boolean pushEvents = true;
+    private volatile boolean pullRequestCreated = true;
+    private volatile boolean pullRequestUpdated = true;
     private String sourceBranchIncludes;
     private String sourceBranchExcludes;
     private String targetBranchIncludes;
     private String targetBranchExcludes;
-    private boolean ignoreDraft = true;
-    private boolean allowForkPullRequests;
-    private boolean skipDuplicateCommit = true;
+    private volatile boolean ignoreDraft = true;
+    private volatile boolean allowForkPullRequests;
+    private volatile boolean skipDuplicateCommit = true;
     private String credentialsId;
 
     private transient Map<String, Boolean> recentCommits;

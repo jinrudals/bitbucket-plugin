@@ -96,7 +96,8 @@ class EndToEndTest {
         cfg.setAllowUnsignedWebhooks(false);
         cfg.setDefaultCredentialsId("tok");
         cfg.setApiBaseUrl(wm.getHttpBaseUrl());
-        stubFor(post(urlPathMatching("/2.0/repositories/.*/statuses/build")).willReturn(aResponse().withStatus(201)));
+        stubFor(post(urlPathMatching("/2.0/repositories/.*/statuses/build"))
+                .willReturn(aResponse().withStatus(201)));
     }
 
     @AfterEach
@@ -108,14 +109,22 @@ class EndToEndTest {
         var cmd = new java.util.ArrayList<String>();
         cmd.add("git");
         cmd.addAll(List.of(args));
-        Process p = new ProcessBuilder(cmd).directory(repo.toFile()).redirectErrorStream(true).start();
+        Process p = new ProcessBuilder(cmd)
+                .directory(repo.toFile())
+                .redirectErrorStream(true)
+                .start();
         String out = new String(p.getInputStream().readAllBytes());
         assertEquals(0, p.waitFor(), out);
         return out;
     }
 
     private GitSCM scm() {
-        GitSCM scm = new GitSCM(List.of(new UserRemoteConfig(REMOTE, null, null, null)), List.of(new BranchSpec("*/main")), null, null, List.of());
+        GitSCM scm = new GitSCM(
+                List.of(new UserRemoteConfig(REMOTE, null, null, null)),
+                List.of(new BranchSpec("*/main")),
+                null,
+                null,
+                List.of());
         return scm;
     }
 
@@ -151,15 +160,21 @@ class EndToEndTest {
     }
 
     private void awaitFinishedBuild(Job<?, ?> job) throws Exception {
-        await("build of " + job.getFullName(), () -> job.getLastBuild() != null && !job.getLastBuild().isBuilding());
+        await(
+                "build of " + job.getFullName(),
+                () -> job.getLastBuild() != null && !job.getLastBuild().isBuilding());
         j.waitUntilNoActivity();
     }
 
     private void verifyStatuses(String hash) {
-        verify(1, postRequestedFor(urlEqualTo(STATUS_PATH.formatted(hash)))
-                .withRequestBody(matchingJsonPath("$.state", equalTo("INPROGRESS"))));
-        verify(1, postRequestedFor(urlEqualTo(STATUS_PATH.formatted(hash)))
-                .withRequestBody(matchingJsonPath("$.state", equalTo("SUCCESSFUL"))));
+        verify(
+                1,
+                postRequestedFor(urlEqualTo(STATUS_PATH.formatted(hash)))
+                        .withRequestBody(matchingJsonPath("$.state", equalTo("INPROGRESS"))));
+        verify(
+                1,
+                postRequestedFor(urlEqualTo(STATUS_PATH.formatted(hash)))
+                        .withRequestBody(matchingJsonPath("$.state", equalTo("SUCCESSFUL"))));
     }
 
     @Test
@@ -210,7 +225,8 @@ class EndToEndTest {
         assertNotNull(mbp.getItem("main"));
         j.waitUntilNoActivity();
         reset();
-        stubFor(post(urlPathMatching("/2.0/repositories/.*/statuses/build")).willReturn(aResponse().withStatus(201)));
+        stubFor(post(urlPathMatching("/2.0/repositories/.*/statuses/build"))
+                .willReturn(aResponse().withStatus(201)));
 
         git("checkout", "-q", "-b", "dev");
         Files.writeString(repo.resolve("x.txt"), "x");
@@ -220,7 +236,9 @@ class EndToEndTest {
         String body = payload("push.json", "acme/app").replace("\"name\":\"main\"", "\"name\":\"dev\"");
 
         assertEquals(202, webhook("repo:push", body));
-        await("dev branch job", () -> mbp.getItem("dev") != null && mbp.getItem("dev").getLastBuild() != null);
+        await(
+                "dev branch job",
+                () -> mbp.getItem("dev") != null && mbp.getItem("dev").getLastBuild() != null);
         WorkflowJob dev = mbp.getItem("dev");
         awaitFinishedBuild(dev);
         assertEquals(Result.SUCCESS, dev.getLastBuild().getResult());

@@ -18,8 +18,11 @@ public class TriggerEventDispatcher implements EventDispatcher {
     public void dispatch(BitbucketEvent e) {
         RepoKey repo;
         try {
+            if (e.repoFullName() == null) {
+                throw new IllegalArgumentException();
+            }
             repo = RepoKey.fromFullName(e.repoFullName());
-        } catch (IllegalArgumentException | NullPointerException ex) {
+        } catch (IllegalArgumentException ex) {
             LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
             return;
         }

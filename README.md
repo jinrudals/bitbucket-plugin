@@ -29,13 +29,17 @@ trigger. Supported types:
 - Secret text (repository / workspace access token, sent as a Bearer token)
 - Bitbucket OAuth consumer (client credentials)
 
+Credentials are looked up at Jenkins global scope (system and global credentials), not in folder scope. The
+credential selected as the *Webhook secret* is never used as an API credential.
+
 Required Bitbucket scopes: **repository read**, **pull request read**, **repository write** (commit statuses).
 
 ### Jobs
 
 Freestyle and Pipeline jobs: enable *Build when a change is pushed to Bitbucket Cloud* and use a Git SCM whose
 remote is the Bitbucket repository. Multibranch projects need no trigger; push and pull-request events refresh
-the matching branch source.
+the matching branch source. Multibranch builds do not receive the `bitbucket*` environment variables
+(they are exported only for builds started by the trigger).
 
 ```groovy
 pipeline {

@@ -2,8 +2,8 @@ package io.jenkins.plugins.bitbucketcloud.trigger;
 
 import hudson.EnvVars;
 import hudson.Util;
-import hudson.model.EnvironmentContributingAction;
 import hudson.model.Action;
+import hudson.model.EnvironmentContributingAction;
 import hudson.model.InvisibleAction;
 import hudson.model.Queue;
 import hudson.model.Run;

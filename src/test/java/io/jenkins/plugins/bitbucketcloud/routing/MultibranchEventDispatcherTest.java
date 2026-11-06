@@ -11,16 +11,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import jenkins.branch.BranchSource;
-import org.jenkinsci.plugins.workflow.job.WorkflowJob;
-import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject;
-import org.junit.jupiter.api.io.TempDir;
 import jenkins.plugins.git.GitSCMSource;
 import jenkins.scm.api.SCMEvent;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMRevision;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
+import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
 
@@ -42,7 +42,8 @@ class MultibranchEventDispatcherTest {
 
     @Test
     void pushMatchesSourceAndYieldsBranchHead(JenkinsRule j) {
-        var ev = new BitbucketHeadEvent(new PushEvent("ws/repo", "a", "feature/x", "abc123"), new RepoKey("ws", "repo"));
+        var ev =
+                new BitbucketHeadEvent(new PushEvent("ws/repo", "a", "feature/x", "abc123"), new RepoKey("ws", "repo"));
         var source = new GitSCMSource(REMOTE);
         assertTrue(ev.isMatch(source));
         var heads = ev.heads(source);
@@ -84,7 +85,9 @@ class MultibranchEventDispatcherTest {
     @Test
     void forkPullRequestYieldsNoHeads(JenkinsRule j) {
         var pr = new PullRequestEvent("ws/repo", "a", "created", "1", "topic", "main", "def456", false, true);
-        assertTrue(new BitbucketHeadEvent(pr, new RepoKey("ws", "repo")).heads(new GitSCMSource(REMOTE)).isEmpty());
+        assertTrue(new BitbucketHeadEvent(pr, new RepoKey("ws", "repo"))
+                .heads(new GitSCMSource(REMOTE))
+                .isEmpty());
     }
 
     @Test
@@ -129,7 +132,10 @@ class MultibranchEventDispatcherTest {
         var cmd = new java.util.ArrayList<String>();
         cmd.add("git");
         cmd.addAll(java.util.List.of(args));
-        Process p = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true).start();
+        Process p = new ProcessBuilder(cmd)
+                .directory(dir.toFile())
+                .redirectErrorStream(true)
+                .start();
         String out = new String(p.getInputStream().readAllBytes());
         assertEquals(0, p.waitFor(), out);
         return out;

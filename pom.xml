@@ -37,8 +37,7 @@
     <jenkins.baseline>2.452</jenkins.baseline>
     <jenkins.version>${jenkins.baseline}.4</jenkins.version>
     <java.level>17</java.level>
-    <spotbugs.skip>true</spotbugs.skip>
-    <spotless.check.skip>true</spotless.check.skip>
+    <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
