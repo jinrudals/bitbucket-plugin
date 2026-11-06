@@ -15,10 +15,14 @@ public class MultibranchEventDispatcher implements EventDispatcher {
 
     @Override
     public void dispatch(BitbucketEvent e) {
+        if (e.repoFullName() == null) {
+            LOGGER.log(Level.FINE, "Ignoring event without repository name");
+            return;
+        }
         RepoKey repo;
         try {
             repo = RepoKey.fromFullName(e.repoFullName());
-        } catch (IllegalArgumentException | NullPointerException ex) {
+        } catch (IllegalArgumentException ex) {
             LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
             return;
         }

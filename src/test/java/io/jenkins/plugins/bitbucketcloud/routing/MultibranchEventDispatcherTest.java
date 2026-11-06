@@ -15,6 +15,7 @@ import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject;
 import org.junit.jupiter.api.io.TempDir;
 import jenkins.plugins.git.GitSCMSource;
+import jenkins.scm.api.SCMEvent;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMRevision;
 import org.junit.jupiter.api.AfterEach;
@@ -65,7 +66,25 @@ class MultibranchEventDispatcherTest {
         var pr = new PullRequestEvent("ws/repo", "a", "created", "1", "topic", "main", "def456", false, false);
         var ev = new BitbucketHeadEvent(pr, new RepoKey("ws", "repo"));
         var heads = ev.heads(new GitSCMSource(REMOTE));
-        assertEquals("topic", heads.keySet().iterator().next().getName());
+        SCMHead head = heads.keySet().iterator().next();
+        assertEquals("topic", head.getName());
+        assertEquals("def456", heads.get(head).toString());
+        assertEquals(SCMEvent.Type.CREATED, ev.getType());
+    }
+
+    @Test
+    void mergedAndDeclinedPullRequestsNeverRemoveBranch(JenkinsRule j) {
+        for (String type : new String[] {"fulfilled", "rejected", "updated"}) {
+            var pr = new PullRequestEvent("ws/repo", "a", type, "1", "topic", "main", "def456", false, false);
+            var ev = new BitbucketHeadEvent(pr, new RepoKey("ws", "repo"));
+            assertEquals(SCMEvent.Type.UPDATED, ev.getType(), type);
+        }
+    }
+
+    @Test
+    void forkPullRequestYieldsNoHeads(JenkinsRule j) {
+        var pr = new PullRequestEvent("ws/repo", "a", "created", "1", "topic", "main", "def456", false, true);
+        assertTrue(new BitbucketHeadEvent(pr, new RepoKey("ws", "repo")).heads(new GitSCMSource(REMOTE)).isEmpty());
     }
 
     @Test
@@ -90,7 +109,7 @@ class MultibranchEventDispatcherTest {
         String sha = git(dir, "rev-parse", "HEAD").trim();
 
         new MultibranchEventDispatcher().dispatch(new PushEvent("other/repo", "a", "dev", sha));
-        Thread.sleep(1500);
+        j.waitUntilNoActivity();
         assertNull(mbp.getItem("dev"));
 
         new MultibranchEventDispatcher().dispatch(new PushEvent("ws/repo", "a", "dev", sha));
@@ -117,9 +136,12 @@ class MultibranchEventDispatcherTest {
     }
 
     @Test
-    void dispatcherToleratesMalformedAndUnmatchedEvents(JenkinsRule j) {
+    void dispatcherToleratesMalformedAndUnmatchedEvents(JenkinsRule j) throws Exception {
         var d = new MultibranchEventDispatcher();
         d.dispatch(new PushEvent("garbage", "a", "main", "abc"));
         d.dispatch(new PushEvent("ws/other", "a", "main", "abc"));
+        d.dispatch(new PushEvent(null, "a", "main", "abc"));
+        j.waitUntilNoActivity();
+        assertTrue(j.jenkins.getItems().isEmpty());
     }
 }

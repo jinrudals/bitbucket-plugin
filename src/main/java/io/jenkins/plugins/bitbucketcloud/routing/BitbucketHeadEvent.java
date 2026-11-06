@@ -35,8 +35,10 @@ public class BitbucketHeadEvent extends SCMHeadEvent<BitbucketEvent> {
     }
 
     private static Type typeOf(BitbucketEvent e) {
-        if (e instanceof PullRequestEvent pr && "fulfilled".equals(pr.type())) {
-            return Type.REMOVED;
+        // Merging or declining a PR does not delete the source branch, so never REMOVED.
+        // Branch deletions are not surfaced by EventParser (push changes without a "new" ref are skipped).
+        if (e instanceof PullRequestEvent pr && "created".equals(pr.type())) {
+            return Type.CREATED;
         }
         return Type.UPDATED;
     }
@@ -78,6 +80,10 @@ public class BitbucketHeadEvent extends SCMHeadEvent<BitbucketEvent> {
         if (e instanceof PushEvent push) {
             branch = push.branch();
         } else if (e instanceof PullRequestEvent pr) {
+            // A fork's branch is not a branch of this repository.
+            if (pr.fromFork()) {
+                return Collections.emptyMap();
+            }
             branch = pr.sourceBranch();
         } else {
             return Collections.emptyMap();
