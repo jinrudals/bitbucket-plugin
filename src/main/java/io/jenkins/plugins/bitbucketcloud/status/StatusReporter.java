@@ -1,6 +1,7 @@
 package io.jenkins.plugins.bitbucketcloud.status;
 
 import hudson.Extension;
+import hudson.ExtensionList;
 import hudson.model.Job;
 import hudson.model.Result;
 import hudson.model.Run;
@@ -16,6 +17,7 @@ import io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig;
 import io.jenkins.plugins.bitbucketcloud.routing.RepoKey;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketBuildAction;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,6 +27,13 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jenkins.model.ParameterizedJobMixIn;
+import jenkins.plugins.git.AbstractGitSCMSource;
+import jenkins.plugins.git.GitSCMSource;
+import jenkins.scm.api.SCMRevision;
+import jenkins.scm.api.SCMRevisionAction;
+import jenkins.scm.api.SCMSource;
+import org.jenkinsci.plugins.workflow.flow.FlowExecution;
+import org.jenkinsci.plugins.workflow.flow.FlowExecutionListener;
 
 @Extension
 public class StatusReporter extends RunListener<Run<?, ?>> {
@@ -50,6 +59,26 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
             state = "FAILED";
         }
         report(run, state, "Build " + (r == null ? "SUCCESS" : r.toString()));
+    }
+
+    /**
+     * Multibranch builds learn their revision only once the pipeline definition is loaded, which is after
+     * {@link #onStarted}; report INPROGRESS from there when it could not be reported earlier.
+     */
+    @Extension
+    public static class MultibranchStart extends FlowExecutionListener {
+        @Override
+        public void onRunning(FlowExecution execution) {
+            try {
+                if (execution.getOwner().getExecutable() instanceof Run<?, ?> run
+                        && directTarget(run).isEmpty()
+                        && multibranchTarget(run).isPresent()) {
+                    ExtensionList.lookupSingleton(StatusReporter.class).report(run, "INPROGRESS", "Build started");
+                }
+            } catch (IOException | RuntimeException e) {
+                LOGGER.log(Level.FINE, "Could not report multibranch build start", e);
+            }
+        }
     }
 
     private void report(Run<?, ?> run, String state, String description) {
@@ -110,6 +139,11 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
     }
 
     private static Optional<Target> target(Run<?, ?> run) {
+        Optional<Target> direct = directTarget(run);
+        return direct.isPresent() ? direct : multibranchTarget(run);
+    }
+
+    private static Optional<Target> directTarget(Run<?, ?> run) {
         try {
             BitbucketBuildAction action = run.getAction(BitbucketBuildAction.class);
             if (action != null && action.getRepoFullName() != null && action.getCommitHash() != null) {
@@ -131,5 +165,18 @@ public class StatusReporter extends RunListener<Run<?, ?>> {
             }
         }
         return Optional.empty();
+    }
+
+    // Multibranch builds read the Jenkinsfile lightweight, so there may be no BuildData (at least at start).
+    private static Optional<Target> multibranchTarget(Run<?, ?> run) {
+        SCMSource source = SCMSource.SourceByItem.findSource(run.getParent());
+        if (!(source instanceof GitSCMSource git) || git.getRemote() == null) {
+            return Optional.empty();
+        }
+        SCMRevision revision = SCMRevisionAction.getRevision(source, run);
+        if (!(revision instanceof AbstractGitSCMSource.SCMRevisionImpl rev)) {
+            return Optional.empty();
+        }
+        return RepoKey.fromUrl(git.getRemote()).map(key -> new Target(key, rev.getHash()));
     }
 }
