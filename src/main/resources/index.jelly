@@ -1,0 +1,2 @@
+<?jelly escape-by-default='true'?>
+<div>Triggers builds from Bitbucket Cloud webhooks and reports commit statuses.</div>
