@@ -37,7 +37,8 @@ secret by hand: both are shown/generated in the job configuration page.
   (`rootUrl + "bitbucket/" + <parent path> + "/" + Util.rawEncode(name)`).
 - [x] Secret is stored as `hudson.util.Secret` and auto-generated when empty.
 - [x] Jobs without the trigger enabled ignore the request (`200`, `skipped`).
-- [ ] Trigger must be usable from Pipeline `properties([...])` and JCasC/Job DSL (needs a test).
+- [x] Trigger is usable from Pipeline `properties([pipelineTriggers([bitbucketPush()])])` (covered by a test).
+- [ ] Verify JCasC / Job DSL usage.
 
 ### 3. Signature verification
 - [x] Validate `X-Hub-Signature` (`sha256=<hex>`, HMAC-SHA256 of the raw body)
