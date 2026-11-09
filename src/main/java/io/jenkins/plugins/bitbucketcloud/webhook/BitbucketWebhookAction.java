@@ -123,11 +123,14 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
         for (BitbucketEvent event : events) {
             executor.execute(() -> {
                 try (var ignored = ACL.as2(ACL.SYSTEM2)) {
+                    if (event.repoFullName() == null) {
+                        throw new IllegalArgumentException();
+                    }
                     RepoKey repo = RepoKey.fromFullName(event.repoFullName());
                     JobMatcher.findTrigger(job, repo)
                             .filter(t -> t.accepts(event))
                             .ifPresent(t -> t.fire(event));
-                } catch (IllegalArgumentException | NullPointerException e) {
+                } catch (IllegalArgumentException e) {
                     LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
                 } catch (Exception e) {
                     LOGGER.log(Level.WARNING, "Failed to trigger " + job.getFullName(), e);

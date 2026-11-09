@@ -67,3 +67,25 @@ Set on builds started by a webhook event (Freestyle and Pipeline jobs).
 | `bitbucketRepoFullName` | `workspace/repo` |
 | `bitbucketCommitHash` | Commit being built |
 | `bitbucketActor` | User who triggered the event |
+
+### Commit statuses
+
+Every build reports one automatic status (`Jenkins: <job>`, key = job name): `INPROGRESS` at start, then
+`SUCCESSFUL` / `FAILED` / `STOPPED`. A Pipeline can add more named statuses on the same commit with
+`bitbucketStatus`; calling it again with the same `name` updates that status.
+
+```groovy
+bitbucketStatus(name: 'lint', state: 'INPROGRESS')
+bitbucketStatus(name: 'lint', state: 'SUCCESSFUL')
+bitbucketStatus(name: 'test', state: 'FAILED', description: '3 failures')
+```
+
+| Parameter | Value |
+| --- | --- |
+| `name` | Required. Shown as `Jenkins: <job> / <name>`; key is `<job>/<name>` (shortened with a hash beyond 40 chars) |
+| `state` | Required. `INPROGRESS`, `SUCCESSFUL`, `FAILED` or `STOPPED` |
+| `description` | Optional text |
+| `url` | Optional link; defaults to the build URL |
+
+The commit and repository come from the webhook event or the Git checkout, and credentials from the trigger or the
+global default. If they cannot be resolved the step logs a warning and the build continues.
