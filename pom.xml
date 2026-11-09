@@ -13,7 +13,7 @@
   <version>${revision}${changelist}</version>
   <packaging>hpi</packaging>
   <name>Bitbucket Cloud Plugin</name>
-  <description>Triggers builds from Bitbucket Cloud webhooks and reports commit statuses.</description>
+  <description>Manages Bitbucket Cloud workspace credentials for Jenkins.</description>
   <url>https://github.com/jenkinsci/bitbucket-cloud-plugin</url>
 
   <licenses>
@@ -58,36 +58,11 @@
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
-      <artifactId>git</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>jackson2-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.jenkins-ci.plugins</groupId>
       <artifactId>plain-credentials</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins</groupId>
-      <artifactId>scm-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins.workflow</groupId>
-      <artifactId>workflow-cps</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins.workflow</groupId>
-      <artifactId>workflow-job</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins.workflow</groupId>
-      <artifactId>workflow-multibranch</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jenkins-ci.plugins.workflow</groupId>
-      <artifactId>workflow-basic-steps</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.wiremock</groupId>

@@ -110,31 +110,11 @@ class AuthTest {
         store.add(new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "up", "d", "u", "p"));
         store.add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "str", "d", Secret.fromString("t")));
         store.add(new BitbucketOAuthCredentials(CredentialsScope.GLOBAL, "oa", "d", "cid", Secret.fromString("cs")));
-        assertInstanceOf(BasicAuth.class, AuthResolver.resolve("up").orElseThrow());
-        assertInstanceOf(BearerAuth.class, AuthResolver.resolve("str").orElseThrow());
+        assertInstanceOf(BasicAuth.class, AuthResolver.resolveWorkspaceCredential("up").orElseThrow());
+        assertInstanceOf(BearerAuth.class, AuthResolver.resolveWorkspaceCredential("str").orElseThrow());
         assertInstanceOf(
-                OAuthClientCredentialsAuth.class, AuthResolver.resolve("oa").orElseThrow());
-        assertEquals(Optional.empty(), AuthResolver.resolve("nope"));
-        assertEquals(Optional.empty(), AuthResolver.resolve(null));
-    }
-
-    @Test
-    void webhookSecretCredentialNeverUsedAsApiCredential(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance()
-                .getCredentials()
-                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("t")));
-        assertInstanceOf(BearerAuth.class, AuthResolver.resolve("wh").orElseThrow());
-        io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
-        assertEquals(Optional.empty(), AuthResolver.resolve("wh"));
-    }
-
-    @Test
-    void workspaceResolverCanUseCredentialAlsoSelectedAsLegacyWebhookSecret(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance()
-                .getCredentials()
-                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("t")));
-        io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
-
-        assertInstanceOf(BearerAuth.class, AuthResolver.resolveWorkspaceCredential("wh").orElseThrow());
+                OAuthClientCredentialsAuth.class, AuthResolver.resolveWorkspaceCredential("oa").orElseThrow());
+        assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential("nope"));
+        assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential(null));
     }
 }
