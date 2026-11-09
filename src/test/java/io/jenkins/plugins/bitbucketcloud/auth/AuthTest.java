@@ -105,6 +105,46 @@ class AuthTest {
     }
 
     @Test
+    void oauthTokenTimeoutIsClassified(WireMockRuntimeInfo wm) {
+        stubFor(post("/token").willReturn(aResponse().withStatus(200).withFixedDelay(500)));
+        OAuthClientCredentialsAuth auth = new OAuthClientCredentialsAuth(
+                "id",
+                Secret.fromString("secret"),
+                URI.create(wm.getHttpBaseUrl() + "/token"),
+                new MutableClock(),
+                Duration.ofMillis(100));
+
+        OAuthClientCredentialsAuth.TokenRequestException failure = assertThrows(
+                OAuthClientCredentialsAuth.TokenRequestException.class,
+                () -> auth.applyTo(HttpRequest.newBuilder(URI.create("http://localhost/x"))));
+
+        assertEquals(OAuthClientCredentialsAuth.TokenRequestException.Failure.TIMEOUT, failure.failure());
+        assertFalse(failure.getMessage().contains("secret"));
+    }
+
+    @Test
+    void oauthTokenInterruptionIsClassifiedAndRestoresInterruptFlag(WireMockRuntimeInfo wm) {
+        OAuthClientCredentialsAuth auth = new OAuthClientCredentialsAuth(
+                "id",
+                Secret.fromString("secret"),
+                URI.create(wm.getHttpBaseUrl() + "/token"),
+                new MutableClock(),
+                Duration.ofSeconds(1));
+        try {
+            Thread.currentThread().interrupt();
+
+            OAuthClientCredentialsAuth.TokenRequestException failure = assertThrows(
+                    OAuthClientCredentialsAuth.TokenRequestException.class,
+                    () -> auth.applyTo(HttpRequest.newBuilder(URI.create("http://localhost/x"))));
+
+            assertEquals(OAuthClientCredentialsAuth.TokenRequestException.Failure.INTERRUPTED, failure.failure());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     void resolverMapsTypes(JenkinsRule j) throws Exception {
         var store = SystemCredentialsProvider.getInstance().getCredentials();
         store.add(new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "up", "d", "u", "p"));

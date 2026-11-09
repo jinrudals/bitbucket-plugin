@@ -155,4 +155,17 @@ class BitbucketWorkspaceClientTest {
         assertFalse(result.toString().contains("client-secret"));
         assertFalse(result.toString().contains("OAUTH_RESPONSE_MARKER"));
     }
+
+    @Test
+    void oauthTokenTimeoutReturnsTimeoutOutcome(WireMockRuntimeInfo wm) {
+        BitbucketWorkspaceClient.WorkspaceTestResult result = client(wm).testWorkspace(
+                "team",
+                request -> {
+                    throw new OAuthClientCredentialsAuth.TokenRequestException(
+                            OAuthClientCredentialsAuth.TokenRequestException.Failure.TIMEOUT,
+                            "OAuth token request timed out.");
+                });
+
+        assertEquals(BitbucketWorkspaceClient.Outcome.TIMEOUT, result.outcome());
+    }
 }
