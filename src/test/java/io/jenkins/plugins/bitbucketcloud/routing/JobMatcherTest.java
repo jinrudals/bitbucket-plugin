@@ -1,28 +1,16 @@
 package io.jenkins.plugins.bitbucketcloud.routing;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import hudson.model.FreeStyleProject;
 import hudson.plugins.git.GitSCM;
-import hudson.security.ACL;
-import hudson.triggers.TriggerDescriptor;
-import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
-import io.jenkins.plugins.bitbucketcloud.event.PushEvent;
 import io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger;
-import java.util.List;
-import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
-import org.jvnet.hudson.test.MockAuthorizationStrategy;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 @WithJenkins
 class JobMatcherTest {

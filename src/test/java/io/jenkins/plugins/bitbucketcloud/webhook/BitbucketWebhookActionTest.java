@@ -210,7 +210,9 @@ class BitbucketWebhookActionTest {
         FreeStyleProject a = job("a", REPO);
         BitbucketGlobalConfig.get().setAllowUnsignedWebhooks(true);
         byte[] body = fixture("push.json");
-        assertEquals(401, post("job/a", body, "repo:push", "sha256=" + "00".repeat(32)).statusCode());
+        assertEquals(
+                401,
+                post("job/a", body, "repo:push", "sha256=" + "00".repeat(32)).statusCode());
         assertEquals(401, post("job/a", body, "repo:push", null).statusCode());
         assertNoBuild(a);
     }
