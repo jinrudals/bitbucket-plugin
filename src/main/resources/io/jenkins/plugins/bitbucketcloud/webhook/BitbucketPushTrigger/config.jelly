@@ -1,0 +1,18 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:entry title="Webhook URL">
+    <f:readOnlyTextbox value="${descriptor.webhookUrl(it)}"/>
+  </f:entry>
+  <f:entry title="Secret" field="secretText">
+    <f:textbox default="${descriptor.newSecret()}"/>
+  </f:entry>
+  <f:entry title="Allowed events" field="allowedEvents">
+    <f:textbox default="${descriptor.defaultEvents}"/>
+  </f:entry>
+  <f:entry title="Include branches" field="includeBranches">
+    <f:textbox/>
+  </f:entry>
+  <f:entry title="Exclude branches" field="excludeBranches">
+    <f:textbox/>
+  </f:entry>
+</j:jelly>
