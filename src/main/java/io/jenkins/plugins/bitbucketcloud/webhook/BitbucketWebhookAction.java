@@ -1,8 +1,8 @@
 package io.jenkins.plugins.bitbucketcloud.webhook;
 
 import hudson.Extension;
-import hudson.ExtensionList;
 import hudson.model.Computer;
+import hudson.model.Job;
 import hudson.model.UnprotectedRootAction;
 import hudson.security.ACL;
 import hudson.security.csrf.CrumbExclusion;
@@ -10,6 +10,8 @@ import io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig;
 import io.jenkins.plugins.bitbucketcloud.event.BitbucketEvent;
 import io.jenkins.plugins.bitbucketcloud.event.EventParser;
 import io.jenkins.plugins.bitbucketcloud.event.InvalidPayloadException;
+import io.jenkins.plugins.bitbucketcloud.routing.JobMatcher;
+import io.jenkins.plugins.bitbucketcloud.routing.RepoKey;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +23,7 @@ import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import jenkins.model.Jenkins;
 import jenkins.security.SecurityContextExecutorService;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
@@ -28,6 +31,7 @@ import org.kohsuke.stapler.StaplerResponse;
 @Extension
 public class BitbucketWebhookAction implements UnprotectedRootAction {
     static final String URL_NAME = "bitbucket-webhook";
+    private static final String JOB_PREFIX = "/job/";
     static final int MAX_BODY_BYTES = 5 * 1024 * 1024;
     private static final Logger LOGGER = Logger.getLogger(BitbucketWebhookAction.class.getName());
 
@@ -71,6 +75,12 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
             reply(rsp, 401, "Unauthorized");
             return;
         }
+        // Checked after the signature so unauthenticated callers cannot probe job names.
+        Optional<Job<?, ?>> job = resolveJob(req.getRestOfPath());
+        if (job.isEmpty()) {
+            reply(rsp, 404, "Not found");
+            return;
+        }
         if (body.length == 0) {
             reply(rsp, 400, "Empty payload");
             return;
@@ -87,8 +97,20 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
             reply(rsp, 200, "Ignored");
             return;
         }
-        dispatchAsync(events);
+        dispatchAsync(job.get(), events);
         reply(rsp, 202, "Accepted");
+    }
+
+    /** Resolves {@code /job/<fullName>} to a job that has a {@link io.jenkins.plugins.bitbucketcloud.trigger.BitbucketTrigger}. */
+    private static Optional<Job<?, ?>> resolveJob(String restOfPath) {
+        if (restOfPath == null || !restOfPath.startsWith(JOB_PREFIX) || restOfPath.length() == JOB_PREFIX.length()) {
+            return Optional.empty();
+        }
+        String fullName = restOfPath.substring(JOB_PREFIX.length());
+        try (var ignored = ACL.as2(ACL.SYSTEM2)) {
+            Job<?, ?> job = Jenkins.get().getItemByFullName(fullName, Job.class);
+            return job != null && JobMatcher.triggerOf(job).isPresent() ? Optional.of(job) : Optional.empty();
+        }
     }
 
     private static byte[] readBody(InputStream in) throws IOException {
@@ -96,23 +118,21 @@ public class BitbucketWebhookAction implements UnprotectedRootAction {
         return bytes.length > MAX_BODY_BYTES ? null : bytes;
     }
 
-    private static void dispatchAsync(List<BitbucketEvent> events) {
-        List<EventDispatcher> dispatchers = ExtensionList.lookup(EventDispatcher.class);
+    private static void dispatchAsync(Job<?, ?> job, List<BitbucketEvent> events) {
         SecurityContextExecutorService executor = new SecurityContextExecutorService(Computer.threadPoolForRemoting);
         for (BitbucketEvent event : events) {
-            for (EventDispatcher dispatcher : dispatchers) {
-                executor.execute(() -> {
-                    try (var ignored = ACL.as2(ACL.SYSTEM2)) {
-                        dispatcher.dispatch(event);
-                    } catch (Exception e) {
-                        LOGGER.log(
-                                Level.WARNING,
-                                "Event dispatcher " + dispatcher.getClass().getName() + " failed: "
-                                        + e.getClass().getName(),
-                                e);
-                    }
-                });
-            }
+            executor.execute(() -> {
+                try (var ignored = ACL.as2(ACL.SYSTEM2)) {
+                    RepoKey repo = RepoKey.fromFullName(event.repoFullName());
+                    JobMatcher.findTrigger(job, repo)
+                            .filter(t -> t.accepts(event))
+                            .ifPresent(t -> t.fire(event));
+                } catch (IllegalArgumentException | NullPointerException e) {
+                    LOGGER.log(Level.FINE, "Ignoring event with malformed repository name");
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Failed to trigger " + job.getFullName(), e);
+                }
+            });
         }
     }
 

@@ -47,12 +47,13 @@ class JobMatcherTest {
     @Test
     void matchesFreestyleByRepo(JenkinsRule j) throws Exception {
         BitbucketTrigger t = new BitbucketTrigger();
-        freestyle(j, "match", URL, t);
-        freestyle(j, "other", "https://bitbucket.org/ws/other.git", new BitbucketTrigger());
-        freestyle(j, "notrigger", URL, null);
-        List<BitbucketTrigger> found = JobMatcher.findTriggers(RepoKey.fromFullName("ws/Repo"));
-        assertEquals(1, found.size());
-        assertSame(t, found.get(0));
+        FreeStyleProject match = freestyle(j, "match", URL, t);
+        FreeStyleProject other = freestyle(j, "other", "https://bitbucket.org/ws/other.git", new BitbucketTrigger());
+        FreeStyleProject none = freestyle(j, "notrigger", URL, null);
+        RepoKey repo = RepoKey.fromFullName("ws/Repo");
+        assertSame(t, JobMatcher.findTrigger(match, repo).orElseThrow());
+        assertTrue(JobMatcher.findTrigger(other, repo).isEmpty());
+        assertTrue(JobMatcher.findTrigger(none, repo).isEmpty());
     }
 
     @Test
@@ -61,7 +62,7 @@ class JobMatcherTest {
         job.setDefinition(new CpsScmFlowDefinition(scm(URL), "Jenkinsfile"));
         BitbucketTrigger t = new BitbucketTrigger();
         job.addTrigger(t);
-        assertEquals(List.of(t), JobMatcher.findTriggers(new RepoKey("ws", "repo")));
+        assertSame(t, JobMatcher.findTrigger(job, new RepoKey("ws", "repo")).orElseThrow());
     }
 
     @Test
@@ -80,77 +81,19 @@ class JobMatcherTest {
         other.addTrigger(t3);
         WorkflowJob unset = j.createProject(WorkflowJob.class, "inline-unset");
         unset.addTrigger(new BitbucketTrigger());
-        assertEquals(List.of(t1, t2), JobMatcher.findTriggers(new RepoKey("ws", "repo")));
+        RepoKey repo = new RepoKey("ws", "repo");
+        assertSame(t1, JobMatcher.findTrigger(byName, repo).orElseThrow());
+        assertSame(t2, JobMatcher.findTrigger(byUrl, repo).orElseThrow());
+        assertTrue(JobMatcher.findTrigger(other, repo).isEmpty());
+        assertTrue(JobMatcher.findTrigger(unset, repo).isEmpty());
     }
 
     @Test
     void explicitRepositoryOverridesScmUrl(JenkinsRule j) throws Exception {
         BitbucketTrigger t = new BitbucketTrigger();
         t.setRepository("ws/elsewhere");
-        freestyle(j, "explicit", URL, t);
-        assertTrue(JobMatcher.findTriggers(new RepoKey("ws", "repo")).isEmpty());
-        assertEquals(List.of(t), JobMatcher.findTriggers(new RepoKey("ws", "elsewhere")));
-    }
-
-    @Test
-    void throwingTriggerDoesNotStopOthers(JenkinsRule j) throws Exception {
-        BitbucketTrigger bad = new ThrowingTrigger();
-        freestyle(j, "a-bad", URL, bad);
-        FreeStyleProject good = freestyle(j, "b-good", URL, new BitbucketTrigger());
-        new TriggerEventDispatcher().dispatch(new PushEvent("ws/repo", "me", "main", "abc"));
-        j.waitUntilNoActivity();
-        assertEquals(2, good.getNextBuildNumber());
-    }
-
-    @Test
-    void malformedRepoNameIsIgnored(JenkinsRule j) throws Exception {
-        FreeStyleProject p = freestyle(j, "p", URL, new BitbucketTrigger());
-        new TriggerEventDispatcher().dispatch(new PushEvent("nonsense", "me", "main", "abc"));
-        j.waitUntilNoActivity();
-        assertTrue(p.getBuilds().isEmpty());
-    }
-
-    @Test
-    void dispatchFiresUnderSystemWhenCallerIsAnonymous(JenkinsRule j) throws Exception {
-        AuthRecordingTrigger trigger = new AuthRecordingTrigger();
-        FreeStyleProject p = freestyle(j, "hidden", URL, trigger);
-        j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
-        j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy());
-        Authentication anon = new AnonymousAuthenticationToken(
-                "anonymous", "anonymous", AuthorityUtils.createAuthorityList("anonymous"));
-        try (var ignored = ACL.as2(anon)) {
-            assertEquals(anon, SecurityContextHolder.getContext().getAuthentication());
-            new TriggerEventDispatcher().dispatch(new PushEvent("ws/repo", "me", "main", "abc"));
-        }
-        j.waitUntilNoActivity();
-        assertEquals(2, p.getNextBuildNumber());
-        assertEquals(ACL.SYSTEM2, trigger.acceptsAuth);
-    }
-
-    public static class AuthRecordingTrigger extends BitbucketTrigger {
-        Authentication acceptsAuth;
-
-        @Override
-        public boolean accepts(BitbucketEvent e) {
-            acceptsAuth = SecurityContextHolder.getContext().getAuthentication();
-            return super.accepts(e);
-        }
-
-        @Override
-        public TriggerDescriptor getDescriptor() {
-            return Jenkins.get().getDescriptorByType(BitbucketTrigger.DescriptorImpl.class);
-        }
-    }
-
-    public static class ThrowingTrigger extends BitbucketTrigger {
-        @Override
-        public boolean accepts(BitbucketEvent e) {
-            throw new IllegalStateException("boom");
-        }
-
-        @Override
-        public TriggerDescriptor getDescriptor() {
-            return Jenkins.get().getDescriptorByType(BitbucketTrigger.DescriptorImpl.class);
-        }
+        FreeStyleProject p = freestyle(j, "explicit", URL, t);
+        assertTrue(JobMatcher.findTrigger(p, new RepoKey("ws", "repo")).isEmpty());
+        assertSame(t, JobMatcher.findTrigger(p, new RepoKey("ws", "elsewhere")).orElseThrow());
     }
 }

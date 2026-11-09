@@ -141,9 +141,9 @@ class EndToEndTest {
                 .replace("fff999", sha);
     }
 
-    private int webhook(String event, String body) throws Exception {
+    private int webhook(String job, String event, String body) throws Exception {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        HttpRequest r = HttpRequest.newBuilder(URI.create(j.getURL() + "bitbucket-webhook/"))
+        HttpRequest r = HttpRequest.newBuilder(URI.create(j.getURL() + "bitbucket-webhook/job/" + job))
                 .header("X-Event-Key", event)
                 .header("X-Hub-Signature", sign(bytes))
                 .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
@@ -187,7 +187,7 @@ class EndToEndTest {
         p.addTrigger(t);
         t.start(p, true);
 
-        assertEquals(202, webhook("repo:push", payload("push.json", "acme/app")));
+        assertEquals(202, webhook("fs", "repo:push", payload("push.json", "acme/app")));
         awaitFinishedBuild(p);
 
         FreeStyleBuild b = p.getLastBuild();
@@ -206,42 +206,12 @@ class EndToEndTest {
         p.addTrigger(t);
         t.start(p, true);
 
-        assertEquals(202, webhook("pullrequest:created", payload("pr-created.json", "acme/app")));
+        assertEquals(202, webhook("pipe", "pullrequest:created", payload("pr-created.json", "acme/app")));
         awaitFinishedBuild(p);
 
         WorkflowRun b = p.getLastBuild();
         j.assertBuildStatusSuccess(b);
         j.assertLogContains("branch=feature/x commit=" + sha, b);
-        verifyStatuses(sha);
-    }
-
-    @Test
-    void multibranchIndexesAndBuildsNewBranchFromPush() throws Exception {
-        WorkflowMultiBranchProject mbp = j.createProject(WorkflowMultiBranchProject.class, "mb");
-        GitSCMSource source = new GitSCMSource(REMOTE);
-        source.setTraits(List.of(new BranchDiscoveryTrait()));
-        mbp.getSourcesList().add(new BranchSource(source));
-        mbp.scheduleBuild2(0).getFuture().get();
-        assertNotNull(mbp.getItem("main"));
-        j.waitUntilNoActivity();
-        reset();
-        stubFor(post(urlPathMatching("/2.0/repositories/.*/statuses/build"))
-                .willReturn(aResponse().withStatus(201)));
-
-        git("checkout", "-q", "-b", "dev");
-        Files.writeString(repo.resolve("x.txt"), "x");
-        git("add", ".");
-        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "dev");
-        sha = git("rev-parse", "HEAD").trim();
-        String body = payload("push.json", "acme/app").replace("\"name\":\"main\"", "\"name\":\"dev\"");
-
-        assertEquals(202, webhook("repo:push", body));
-        await(
-                "dev branch job",
-                () -> mbp.getItem("dev") != null && mbp.getItem("dev").getLastBuild() != null);
-        WorkflowJob dev = mbp.getItem("dev");
-        awaitFinishedBuild(dev);
-        assertEquals(Result.SUCCESS, dev.getLastBuild().getResult());
         verifyStatuses(sha);
     }
 
@@ -253,11 +223,11 @@ class EndToEndTest {
         p.addTrigger(t);
         t.start(p, true);
 
-        assertEquals(202, webhook("repo:push", payload("push.json", "acme/app")));
+        assertEquals(202, webhook("dedupe", "repo:push", payload("push.json", "acme/app")));
         awaitFinishedBuild(p);
         assertEquals(2, p.getNextBuildNumber());
 
-        assertEquals(202, webhook("pullrequest:updated", payload("pr-updated.json", "acme/app")));
+        assertEquals(202, webhook("dedupe", "pullrequest:updated", payload("pr-updated.json", "acme/app")));
         Thread.sleep(2000);
         j.waitUntilNoActivity();
         assertEquals(2, p.getNextBuildNumber());
@@ -272,7 +242,7 @@ class EndToEndTest {
         p.addTrigger(t);
         t.start(p, true);
 
-        assertEquals(202, webhook("repo:push", payload("push.json", "other/unknown")));
+        assertEquals(202, webhook("fs", "repo:push", payload("push.json", "other/unknown")));
         Thread.sleep(2000);
         j.waitUntilNoActivity();
         assertNull(p.getLastBuild());

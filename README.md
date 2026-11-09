@@ -10,15 +10,18 @@ Jenkins plugin that triggers builds from Bitbucket Cloud webhooks and reports co
 
 ### Webhook
 
-Create a **workspace webhook** in Bitbucket Cloud (Workspace settings → Webhooks) with:
+Create one webhook per Jenkins job, at repository level (Repository settings → Webhooks) or workspace level, with:
 
-- **URL:** `https://<jenkins>/bitbucket-webhook/`
+- **URL:** `https://<jenkins>/bitbucket-webhook/job/<job full name>` (e.g. `…/bitbucket-webhook/job/my-job`, or
+  `…/job/my-folder/my-job` for a job in a folder). The event is delivered only to that job's trigger; there is no
+  global routing, so `/bitbucket-webhook/` alone answers 404.
 - **Secret:** a random string. Store the same value in Jenkins as a *Secret text* credential and select it as
   *Webhook secret* under Manage Jenkins → System → Bitbucket Cloud. Requests are verified by their
   `X-Hub-Signature` HMAC-SHA256 header; unsigned requests are rejected unless *Allow unsigned webhooks* is enabled.
 - **Triggers:** Repository push, Pull request created, Pull request updated.
 
-Events for repositories that no job or multibranch source points at are ignored.
+The job must have the *Build when a change is pushed to Bitbucket Cloud* trigger. Its repository (the explicit
+*Repository* field, or the Git SCM remote) and branch filters still decide whether an event builds.
 
 ### Credentials
 
@@ -36,10 +39,9 @@ Required Bitbucket scopes: **repository read**, **pull request read**, **reposit
 
 ### Jobs
 
-Freestyle and Pipeline jobs: enable *Build when a change is pushed to Bitbucket Cloud* and use a Git SCM whose
-remote is the Bitbucket repository. Multibranch projects need no trigger; push and pull-request events refresh
-the matching branch source. Multibranch builds do not receive the `bitbucket*` environment variables
-(they are exported only for builds started by the trigger).
+Freestyle and Pipeline jobs: enable *Build when a change is pushed to Bitbucket Cloud* and either use a Git SCM
+whose remote is the Bitbucket repository or set the trigger's `repository` (`workspace/repo`). Multibranch
+projects are not triggered by webhooks.
 
 ```groovy
 pipeline {
