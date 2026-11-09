@@ -127,4 +127,14 @@ class AuthTest {
         io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
         assertEquals(Optional.empty(), AuthResolver.resolve("wh"));
     }
+
+    @Test
+    void workspaceResolverCanUseCredentialAlsoSelectedAsLegacyWebhookSecret(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("t")));
+        io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
+
+        assertInstanceOf(BearerAuth.class, AuthResolver.resolveWorkspaceCredential("wh").orElseThrow());
+    }
 }

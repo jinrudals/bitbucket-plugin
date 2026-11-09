@@ -21,6 +21,17 @@ public final class AuthResolver {
         if (credentialsId.equals(BitbucketGlobalConfig.get().getWebhookSecretId())) {
             return Optional.empty();
         }
+        return resolveCredential(credentialsId);
+    }
+
+    public static Optional<BitbucketAuth> resolveWorkspaceCredential(String credentialsId) {
+        if (credentialsId == null || credentialsId.isBlank()) {
+            return Optional.empty();
+        }
+        return resolveCredential(credentialsId);
+    }
+
+    private static Optional<BitbucketAuth> resolveCredential(String credentialsId) {
         StandardCredentials c = CredentialsMatchers.firstOrNull(
                 CredentialsProvider.lookupCredentialsInItemGroup(
                         StandardCredentials.class,

@@ -12,8 +12,10 @@ import hudson.model.Descriptor;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
+import io.jenkins.plugins.bitbucketcloud.api.BitbucketWorkspaceClient;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
 import java.util.List;
+import java.util.OptionalInt;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import org.junit.jupiter.api.Test;
@@ -124,6 +126,62 @@ class BitbucketGlobalConfigTest {
                     .doFillCredentialsIdItems("current");
             assertEquals(1, options.size());
             assertEquals("current", options.get(0).value);
+        }
+    }
+
+    @Test
+    void testConnectionRequiresAdminister(JenkinsRule j) throws Exception {
+        j.jenkins.setSecurityRealm(j.createDummySecurityRealm());
+        j.jenkins.setAuthorizationStrategy(new MockAuthorizationStrategy()
+                .grant(Jenkins.ADMINISTER)
+                .everywhere()
+                .to("admin")
+                .grant(Jenkins.READ)
+                .everywhere()
+                .to("user"));
+
+        try (var ctx = hudson.security.ACL.as2(
+                hudson.model.User.getOrCreateByIdOrFullName("user").impersonate2())) {
+            FormValidation result = j.jenkins
+                    .getDescriptorByType(BitbucketWorkspaceConnection.DescriptorImpl.class)
+                    .doTestConnection("team", "missing");
+            assertEquals(FormValidation.Kind.ERROR, result.kind);
+        }
+    }
+
+    @Test
+    void testConnectionRejectsMissingOrUnsupportedCredentials(JenkinsRule j) {
+        FormValidation result = j.jenkins
+                .getDescriptorByType(BitbucketWorkspaceConnection.DescriptorImpl.class)
+                .doTestConnection("team", "missing");
+
+        assertEquals(FormValidation.Kind.ERROR, result.kind);
+        assertTrue(result.getMessage().contains("credential"));
+    }
+
+    @Test
+    void testConnectionMapsClientResultToFormValidation(JenkinsRule j) {
+        var descriptor = j.jenkins.getDescriptorByType(BitbucketWorkspaceConnection.DescriptorImpl.class);
+        var outcomes = new BitbucketWorkspaceClient.Outcome[] {
+            BitbucketWorkspaceClient.Outcome.SUCCESS,
+            BitbucketWorkspaceClient.Outcome.UNAUTHORIZED,
+            BitbucketWorkspaceClient.Outcome.FORBIDDEN,
+            BitbucketWorkspaceClient.Outcome.NOT_FOUND,
+            BitbucketWorkspaceClient.Outcome.HTTP_ERROR,
+            BitbucketWorkspaceClient.Outcome.AUTHENTICATION_ERROR,
+            BitbucketWorkspaceClient.Outcome.TIMEOUT,
+            BitbucketWorkspaceClient.Outcome.NETWORK_ERROR,
+            BitbucketWorkspaceClient.Outcome.INTERRUPTED
+        };
+        for (BitbucketWorkspaceClient.Outcome outcome : outcomes) {
+            FormValidation validation = descriptor.toFormValidation(
+                    new BitbucketWorkspaceClient.WorkspaceTestResult(outcome, OptionalInt.empty()));
+            FormValidation.Kind expected = outcome == BitbucketWorkspaceClient.Outcome.SUCCESS
+                    ? FormValidation.Kind.OK
+                    : FormValidation.Kind.ERROR;
+            assertEquals(expected, validation.kind, outcome.name());
+            assertFalse(validation.getMessage().contains("secret"));
+            assertFalse(validation.getMessage().contains("RESPONSE_BODY_MARKER"));
         }
     }
 

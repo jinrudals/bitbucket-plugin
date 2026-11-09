@@ -6,4 +6,5 @@
   <f:entry title="Credentials" field="credentialsId">
     <c:select/>
   </f:entry>
+  <f:validateButton title="Test connection" progress="Testing connection..." method="testConnection" with="workspace,credentialsId"/>
 </j:jelly>
