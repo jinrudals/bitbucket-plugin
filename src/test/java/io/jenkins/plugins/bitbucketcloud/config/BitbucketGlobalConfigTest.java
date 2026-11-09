@@ -11,7 +11,7 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
 import io.jenkins.plugins.bitbucketcloud.api.BitbucketWorkspaceClient;
-import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
+import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuthenticationCredentials;
 import java.util.List;
 import java.util.OptionalInt;
 import jenkins.model.Jenkins;
@@ -88,18 +88,19 @@ class BitbucketGlobalConfigTest {
     @Test
     void credentialPickerContainsSupportedGlobalCredentials(JenkinsRule j) throws Exception {
         var credentials = SystemCredentialsProvider.getInstance().getCredentials();
+        credentials.add(new BitbucketAuthenticationCredentials(
+                CredentialsScope.GLOBAL, "ba", "d", "u", Secret.fromString("p")));
         credentials.add(new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "up", "d", "u", "p"));
         credentials.add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "str", "d", Secret.fromString("t")));
-        credentials.add(new BitbucketOAuthCredentials(CredentialsScope.GLOBAL, "oauth", "d", "id", Secret.fromString("s")));
         credentials.add(new UnsupportedCredentials());
 
         ListBoxModel options =
                 j.jenkins.getDescriptorByType(BitbucketWorkspaceConnection.DescriptorImpl.class)
                         .doFillCredentialsIdItems(null);
 
-        assertTrue(options.stream().anyMatch(option -> "up".equals(option.value)));
-        assertTrue(options.stream().anyMatch(option -> "str".equals(option.value)));
-        assertTrue(options.stream().anyMatch(option -> "oauth".equals(option.value)));
+        assertTrue(options.stream().anyMatch(option -> "ba".equals(option.value)));
+        assertFalse(options.stream().anyMatch(option -> "up".equals(option.value)));
+        assertFalse(options.stream().anyMatch(option -> "str".equals(option.value)));
         assertFalse(options.stream().anyMatch(option -> "unsupported".equals(option.value)));
     }
 

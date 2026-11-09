@@ -4,7 +4,6 @@ import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
@@ -16,12 +15,11 @@ import hudson.util.ListBoxModel;
 import io.jenkins.plugins.bitbucketcloud.api.BitbucketWorkspaceClient;
 import io.jenkins.plugins.bitbucketcloud.auth.AuthResolver;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuth;
-import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
+import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuthenticationCredentials;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import jenkins.model.Jenkins;
-import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
@@ -73,10 +71,7 @@ public class BitbucketWorkspaceConnection extends AbstractDescribableImpl<Bitbuc
                             Jenkins.get(),
                             StandardCredentials.class,
                             URIRequirementBuilder.fromUri(BITBUCKET_AUTH_URI).build(),
-                            CredentialsMatchers.anyOf(
-                                    CredentialsMatchers.instanceOf(StandardUsernamePasswordCredentials.class),
-                                    CredentialsMatchers.instanceOf(StringCredentials.class),
-                                    CredentialsMatchers.instanceOf(BitbucketOAuthCredentials.class)))
+                            CredentialsMatchers.instanceOf(BitbucketAuthenticationCredentials.class))
                     .includeCurrentValue(credentialsId);
         }
 

@@ -1,7 +1,6 @@
 package io.jenkins.plugins.bitbucketcloud.api;
 
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuth;
-import io.jenkins.plugins.bitbucketcloud.auth.OAuthClientCredentialsAuth;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketWorkspaceConnection;
 import java.io.IOException;
 import java.net.URI;
@@ -65,12 +64,6 @@ public final class BitbucketWorkspaceClient {
             return result(Outcome.INTERRUPTED);
         } catch (IOException e) {
             return result(Outcome.NETWORK_ERROR);
-        } catch (OAuthClientCredentialsAuth.TokenRequestException e) {
-            return switch (e.failure()) {
-                case TIMEOUT -> result(Outcome.TIMEOUT);
-                case NETWORK -> result(Outcome.NETWORK_ERROR);
-                case INTERRUPTED -> result(Outcome.INTERRUPTED);
-            };
         } catch (IllegalStateException e) {
             return result(Outcome.AUTHENTICATION_ERROR);
         }

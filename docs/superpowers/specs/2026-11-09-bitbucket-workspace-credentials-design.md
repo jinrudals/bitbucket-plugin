@@ -15,10 +15,8 @@ Jenkins.
 - Manage multiple Bitbucket Cloud workspace connections in Jenkins System
   configuration.
 - Store each workspace slug and a Jenkins credential ID reference.
-- Select global/system credentials supporting:
-  - `StandardUsernamePasswordCredentials`
-  - `StringCredentials` (secret-text credential for HTTP authorization)
-  - `BitbucketOAuthCredentials` (OAuth consumer)
+- Select global/system credentials of the plugin's `BitbucketAuthenticationCredentials`
+  type (Bitbucket username + API token/app password, sent as HTTP Basic).
 - Add, edit, and remove workspace connections.
 - Test an individual connection with a read-only Bitbucket Cloud API request.
 - Validate configuration, enforce administrator-only operations, and report

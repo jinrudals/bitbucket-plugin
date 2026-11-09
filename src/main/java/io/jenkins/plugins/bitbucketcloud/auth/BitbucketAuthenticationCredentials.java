@@ -8,35 +8,35 @@ import hudson.util.Secret;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 
-public class BitbucketOAuthCredentials extends BaseStandardCredentials {
+public class BitbucketAuthenticationCredentials extends BaseStandardCredentials {
     private static final long serialVersionUID = 1L;
 
-    private final String clientId;
-    private final Secret clientSecret;
+    private final String username;
+    private final Secret apiToken;
 
     @DataBoundConstructor
-    public BitbucketOAuthCredentials(
-            CredentialsScope scope, String id, String description, String clientId, Secret clientSecret) {
+    public BitbucketAuthenticationCredentials(
+            CredentialsScope scope, String id, String description, String username, Secret apiToken) {
         super(scope, id, description);
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
+        this.username = username;
+        this.apiToken = apiToken;
     }
 
-    public String getClientId() {
-        return clientId;
+    public String getUsername() {
+        return username;
     }
 
-    public Secret getClientSecret() {
-        return clientSecret;
+    public Secret getApiToken() {
+        return apiToken;
     }
 
     @Extension
-    @Symbol("bitbucketOAuth")
+    @Symbol("bitbucketAuthentication")
     public static class DescriptorImpl extends BaseStandardCredentialsDescriptor {
         @NonNull
         @Override
         public String getDisplayName() {
-            return "Bitbucket OAuth consumer";
+            return "Bitbucket Authentication";
         }
     }
 }
