@@ -1,6 +1,9 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
   <f:section title="Bitbucket Cloud">
+    <f:entry title="Workspace connections">
+      <f:repeatableProperty field="workspaceConnections"/>
+    </f:entry>
     <f:entry title="Webhook secret" field="webhookSecretId">
       <c:select/>
     </f:entry>

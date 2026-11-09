@@ -7,13 +7,18 @@ import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
+import hudson.model.Descriptor;
 import hudson.security.ACL;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketOAuthCredentials;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jenkins.model.GlobalConfiguration;
@@ -36,6 +41,7 @@ public class BitbucketGlobalConfig extends GlobalConfiguration {
     private String defaultCredentialsId;
     private boolean allowUnsignedWebhooks;
     private String apiBaseUrl = DEFAULT_API_BASE_URL;
+    private List<BitbucketWorkspaceConnection> workspaceConnections = new ArrayList<>();
 
     public BitbucketGlobalConfig() {
         load();
@@ -43,6 +49,44 @@ public class BitbucketGlobalConfig extends GlobalConfiguration {
 
     public static BitbucketGlobalConfig get() {
         return GlobalConfiguration.all().getInstance(BitbucketGlobalConfig.class);
+    }
+
+    public List<BitbucketWorkspaceConnection> getWorkspaceConnections() {
+        return workspaceConnections == null ? List.of() : List.copyOf(workspaceConnections);
+    }
+
+    @DataBoundSetter
+    public void setWorkspaceConnections(List<BitbucketWorkspaceConnection> workspaceConnections)
+            throws Descriptor.FormException {
+        List<BitbucketWorkspaceConnection> candidate =
+                workspaceConnections == null ? List.of() : new ArrayList<>(workspaceConnections);
+        FormValidation validation = validateWorkspaceConnections(candidate);
+        if (validation.kind == FormValidation.Kind.ERROR) {
+            throw new Descriptor.FormException(validation.getMessage(), "workspaceConnections");
+        }
+        this.workspaceConnections = List.copyOf(candidate);
+        save();
+    }
+
+    public static FormValidation validateWorkspaceConnections(List<BitbucketWorkspaceConnection> connections) {
+        if (connections == null) {
+            return FormValidation.ok();
+        }
+        Set<String> seen = new HashSet<>();
+        for (BitbucketWorkspaceConnection connection : connections) {
+            if (connection == null || !BitbucketWorkspaceConnection.isValidWorkspaceSlug(connection.getWorkspace())) {
+                return FormValidation.error("Enter a valid Bitbucket Cloud workspace slug.");
+            }
+            if (connection.getCredentialsId() == null || connection.getCredentialsId().isBlank()) {
+                return FormValidation.error("Select a credential for workspace " + connection.getWorkspace() + ".");
+            }
+            String normalizedWorkspace = connection.getWorkspace().toLowerCase(Locale.ROOT);
+            if (!seen.add(normalizedWorkspace)) {
+                return FormValidation.error(
+                        "Workspace " + connection.getWorkspace() + " is listed more than once.");
+            }
+        }
+        return FormValidation.ok();
     }
 
     public String getWebhookSecretId() {
