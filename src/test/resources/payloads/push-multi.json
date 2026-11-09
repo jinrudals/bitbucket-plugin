@@ -1,1 +1,0 @@
-{"push":{"changes":[{"new":{"type":"branch","name":"main","target":{"hash":"abc123"}}},{"new":{"type":"branch","name":"feature/x","target":{"hash":"def456"}}}]},"repository":{"type":"repository","full_name":"acme/app","name":"app"},"actor":{"display_name":"Jane Doe","nickname":"jane"}}

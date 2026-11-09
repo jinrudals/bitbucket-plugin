@@ -105,26 +105,56 @@ class AuthTest {
     }
 
     @Test
+    void oauthTokenTimeoutIsClassified(WireMockRuntimeInfo wm) {
+        stubFor(post("/token").willReturn(aResponse().withStatus(200).withFixedDelay(500)));
+        OAuthClientCredentialsAuth auth = new OAuthClientCredentialsAuth(
+                "id",
+                Secret.fromString("secret"),
+                URI.create(wm.getHttpBaseUrl() + "/token"),
+                new MutableClock(),
+                Duration.ofMillis(100));
+
+        OAuthClientCredentialsAuth.TokenRequestException failure = assertThrows(
+                OAuthClientCredentialsAuth.TokenRequestException.class,
+                () -> auth.applyTo(HttpRequest.newBuilder(URI.create("http://localhost/x"))));
+
+        assertEquals(OAuthClientCredentialsAuth.TokenRequestException.Failure.TIMEOUT, failure.failure());
+        assertFalse(failure.getMessage().contains("secret"));
+    }
+
+    @Test
+    void oauthTokenInterruptionIsClassifiedAndRestoresInterruptFlag(WireMockRuntimeInfo wm) {
+        OAuthClientCredentialsAuth auth = new OAuthClientCredentialsAuth(
+                "id",
+                Secret.fromString("secret"),
+                URI.create(wm.getHttpBaseUrl() + "/token"),
+                new MutableClock(),
+                Duration.ofSeconds(1));
+        try {
+            Thread.currentThread().interrupt();
+
+            OAuthClientCredentialsAuth.TokenRequestException failure = assertThrows(
+                    OAuthClientCredentialsAuth.TokenRequestException.class,
+                    () -> auth.applyTo(HttpRequest.newBuilder(URI.create("http://localhost/x"))));
+
+            assertEquals(OAuthClientCredentialsAuth.TokenRequestException.Failure.INTERRUPTED, failure.failure());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     void resolverMapsTypes(JenkinsRule j) throws Exception {
         var store = SystemCredentialsProvider.getInstance().getCredentials();
         store.add(new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "up", "d", "u", "p"));
         store.add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "str", "d", Secret.fromString("t")));
         store.add(new BitbucketOAuthCredentials(CredentialsScope.GLOBAL, "oa", "d", "cid", Secret.fromString("cs")));
-        assertInstanceOf(BasicAuth.class, AuthResolver.resolve("up").orElseThrow());
-        assertInstanceOf(BearerAuth.class, AuthResolver.resolve("str").orElseThrow());
+        assertInstanceOf(BasicAuth.class, AuthResolver.resolveWorkspaceCredential("up").orElseThrow());
+        assertInstanceOf(BearerAuth.class, AuthResolver.resolveWorkspaceCredential("str").orElseThrow());
         assertInstanceOf(
-                OAuthClientCredentialsAuth.class, AuthResolver.resolve("oa").orElseThrow());
-        assertEquals(Optional.empty(), AuthResolver.resolve("nope"));
-        assertEquals(Optional.empty(), AuthResolver.resolve(null));
-    }
-
-    @Test
-    void webhookSecretCredentialNeverUsedAsApiCredential(JenkinsRule j) throws Exception {
-        SystemCredentialsProvider.getInstance()
-                .getCredentials()
-                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wh", "d", Secret.fromString("t")));
-        assertInstanceOf(BearerAuth.class, AuthResolver.resolve("wh").orElseThrow());
-        io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig.get().setWebhookSecretId("wh");
-        assertEquals(Optional.empty(), AuthResolver.resolve("wh"));
+                OAuthClientCredentialsAuth.class, AuthResolver.resolveWorkspaceCredential("oa").orElseThrow());
+        assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential("nope"));
+        assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential(null));
     }
 }

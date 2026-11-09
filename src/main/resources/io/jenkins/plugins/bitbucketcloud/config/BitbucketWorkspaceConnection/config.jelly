@@ -1,0 +1,10 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
+  <f:entry title="Workspace slug" field="workspace">
+    <f:textbox/>
+  </f:entry>
+  <f:entry title="Credentials" field="credentialsId">
+    <c:select/>
+  </f:entry>
+  <f:validateButton title="Test connection" progress="Testing connection..." method="testConnection" with="workspace,credentialsId"/>
+</j:jelly>
