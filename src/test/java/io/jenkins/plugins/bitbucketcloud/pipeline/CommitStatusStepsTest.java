@@ -166,4 +166,49 @@ class CommitStatusStepsTest {
 
         verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(matchingJsonPath("$.state", equalTo("STOPPED"))));
     }
+
+    private static String declarative(String steps, String post) {
+        return "pipeline {\n  agent any\n  stages {\n    stage('s') {\n      steps {\n" + steps + "\n      }\n    }\n  }\n"
+                + post + "}";
+    }
+
+    @Test
+    void stepsWorkInDeclarativePipelines(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        configure(j, wm, true);
+        WorkflowJob job = j.createProject(WorkflowJob.class);
+        job.setDefinition(new CpsFlowDefinition(
+                declarative(
+                        "updateBitbucketCommitStatus state: 'INPROGRESS', key: 'single', " + ARGS + "\n"
+                                + "bitbucketCommitStatus(key: 'block', " + ARGS + ") { echo 'work' }",
+                        ""),
+                true));
+
+        j.buildAndAssertSuccess(job);
+
+        verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(matchingJsonPath("$.key", equalTo("single"))));
+        verify(1, postRequestedFor(urlEqualTo(PATH))
+                .withRequestBody(matchingJsonPath("$.key", equalTo("block")))
+                .withRequestBody(matchingJsonPath("$.state", equalTo("INPROGRESS"))));
+        verify(1, postRequestedFor(urlEqualTo(PATH))
+                .withRequestBody(matchingJsonPath("$.key", equalTo("block")))
+                .withRequestBody(matchingJsonPath("$.state", equalTo("SUCCESSFUL"))));
+    }
+
+    @Test
+    void declarativeBlockPublishesFailedAndPostCanPublishToo(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        configure(j, wm, true);
+        WorkflowJob job = j.createProject(WorkflowJob.class);
+        job.setDefinition(new CpsFlowDefinition(
+                declarative(
+                        "bitbucketCommitStatus(key: 'block', " + ARGS + ") { error 'boom' }",
+                        "  post { failure { updateBitbucketCommitStatus state: 'FAILED', key: 'post', " + ARGS + " } }\n"),
+                true));
+
+        j.assertBuildStatus(Result.FAILURE, job.scheduleBuild2(0));
+
+        verify(1, postRequestedFor(urlEqualTo(PATH))
+                .withRequestBody(matchingJsonPath("$.key", equalTo("block")))
+                .withRequestBody(matchingJsonPath("$.state", equalTo("FAILED"))));
+        verify(1, postRequestedFor(urlEqualTo(PATH)).withRequestBody(matchingJsonPath("$.key", equalTo("post"))));
+    }
 }
