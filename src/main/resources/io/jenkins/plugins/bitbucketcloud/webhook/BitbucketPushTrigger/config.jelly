@@ -6,13 +6,7 @@
   <f:entry title="Secret" field="secretText">
     <f:textbox default="${descriptor.newSecret()}"/>
   </f:entry>
-  <f:entry title="Allowed events" field="allowedEvents">
-    <f:textbox default="${descriptor.defaultEvents}"/>
-  </f:entry>
-  <f:entry title="Include branches" field="includeBranches">
-    <f:textbox/>
-  </f:entry>
-  <f:entry title="Exclude branches" field="excludeBranches">
-    <f:textbox/>
+  <f:entry title="Rules" field="rules">
+    <f:repeatableProperty field="rules" add="Add rule" minimum="1"/>
   </f:entry>
 </j:jelly>

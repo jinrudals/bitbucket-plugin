@@ -31,14 +31,16 @@ secret by hand: both are shown/generated in the job configuration page.
 - [x] `CrumbExclusion` for paths starting with `/bitbucket/`.
 
 ### 2. Trigger
-- [x] `BitbucketPushTrigger extends Trigger<Job<?, ?>>` with a `@Symbol`
+- [x] `BitbucketPushTrigger extends Trigger<Job<?, ?>>` with a `@Symbol("bitbucket")`
   and `@DataBoundConstructor`, enabled from "Build Triggers".
+- [x] One trigger holds a list of `BitbucketRule`s (OR semantics) sharing one URL and secret. New per-rule
+  conditions are added to `BitbucketRule` only; the trigger does not change.
 - [x] Config page (`config.jelly`) shows the read-only webhook URL
   (`rootUrl + "bitbucket/" + <parent path> + "/" + Util.rawEncode(name)`).
 - [x] Secret is stored as `hudson.util.Secret` and auto-generated when empty.
 - [x] Jobs without the trigger enabled ignore the request (`200`, `skipped`).
-- [x] Trigger is usable from Pipeline `properties([pipelineTriggers([bitbucketPush()])])` (covered by a test).
-- [ ] Verify JCasC / Job DSL usage.
+- [x] Trigger is usable from Pipeline `properties([pipelineTriggers([bitbucket(...)])])` (covered by a test).
+- [x] Job DSL `triggers { bitbucket { rules { rule { ... } } } }` (covered by a test).
 
 ### 3. Signature verification
 - [x] Validate `X-Hub-Signature` (`sha256=<hex>`, HMAC-SHA256 of the raw body)
@@ -49,7 +51,7 @@ secret by hand: both are shown/generated in the job configuration page.
 ### 4. Event and branch filtering
 - [x] Read `X-Event-Key` (e.g. `repo:push`, `pullrequest:created`,
   `pullrequest:updated`, `pullrequest:fulfilled`).
-- [x] Trigger options: allowed event keys (default: `repo:push` only).
+- [x] Per-rule event keys (default: `repo:push` only).
 - [x] Branch/tag include and exclude patterns (wildcard), applied to the
   pushed ref names or the pull request source branch.
 - [x] A request that passes verification but fails filters returns `200`

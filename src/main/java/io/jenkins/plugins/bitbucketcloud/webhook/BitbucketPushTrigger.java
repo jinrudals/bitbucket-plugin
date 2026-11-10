@@ -12,7 +12,6 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.regex.Pattern;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
 import org.jenkinsci.Symbol;
@@ -21,14 +20,10 @@ import org.kohsuke.stapler.DataBoundSetter;
 
 /** Builds the job when a Bitbucket Cloud webhook addressed to this job's own URL passes verification and filters. */
 public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
-    static final String DEFAULT_EVENTS = "repo:push";
-
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private Secret secret;
-    private String allowedEvents = DEFAULT_EVENTS;
-    private String includeBranches = "";
-    private String excludeBranches = "";
+    private List<BitbucketRule> rules = new ArrayList<>();
 
     @DataBoundConstructor
     public BitbucketPushTrigger() {
@@ -50,55 +45,26 @@ public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
         this.secret = Secret.fromString(Util.fixEmptyAndTrim(secretText) == null ? generateSecret() : secretText.trim());
     }
 
-    public String getAllowedEvents() {
-        return allowedEvents;
+    public List<BitbucketRule> getRules() {
+        return List.copyOf(rules);
     }
 
     @DataBoundSetter
-    public void setAllowedEvents(String allowedEvents) {
-        this.allowedEvents = Util.fixEmptyAndTrim(allowedEvents) == null ? DEFAULT_EVENTS : allowedEvents.trim();
-    }
-
-    public String getIncludeBranches() {
-        return includeBranches;
-    }
-
-    @DataBoundSetter
-    public void setIncludeBranches(String includeBranches) {
-        this.includeBranches = Util.fixNull(includeBranches).trim();
-    }
-
-    public String getExcludeBranches() {
-        return excludeBranches;
-    }
-
-    @DataBoundSetter
-    public void setExcludeBranches(String excludeBranches) {
-        this.excludeBranches = Util.fixNull(excludeBranches).trim();
+    public void setRules(List<BitbucketRule> rules) {
+        this.rules = rules == null ? new ArrayList<>() : new ArrayList<>(rules);
     }
 
     boolean verifySignature(byte[] body, String signatureHeader) {
         return SignatureVerifier.verify(getSecretText(), body, signatureHeader);
     }
 
-    /** Returns the reason the event is rejected, or {@code null} when it should start a build. */
-    String rejectionReason(WebhookEvent event) {
-        if (!splitList(allowedEvents).contains(event.getEventKey())) {
-            return "event " + event.getEventKey() + " is not allowed";
-        }
-        if (event.getRefs().isEmpty()) {
-            return "no matching ref in payload";
-        }
-        return matchingRef(event) == null ? "no ref matches the branch filters" : null;
-    }
-
+    /** Returns the ref that satisfied the first matching rule, or {@code null} when no rule matches. */
     String matchingRef(WebhookEvent event) {
-        List<Pattern> includes = toPatterns(includeBranches);
-        List<Pattern> excludes = toPatterns(excludeBranches);
-        for (String ref : event.getRefs()) {
-            boolean included = includes.isEmpty() || includes.stream().anyMatch(p -> p.matcher(ref).matches());
-            boolean excluded = excludes.stream().anyMatch(p -> p.matcher(ref).matches());
-            if (included && !excluded) {
+        // Without explicit rules the trigger behaves as a single default rule (pushes to any branch).
+        List<BitbucketRule> effective = rules.isEmpty() ? List.of(new BitbucketRule()) : rules;
+        for (BitbucketRule rule : effective) {
+            String ref = rule.matchingRef(event);
+            if (ref != null) {
                 return ref;
             }
         }
@@ -106,12 +72,12 @@ public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
     }
 
     /** Schedules a build and returns {@code false} when the job cannot be built right now. */
-    boolean schedule(WebhookEvent event) {
+    boolean schedule(WebhookEvent event, String ref) {
         if (job == null || !job.isBuildable() || !(job instanceof ParameterizedJobMixIn.ParameterizedJob<?, ?> pj)) {
             return false;
         }
         BitbucketWebHookCause cause =
-                new BitbucketWebHookCause(event.getEventKey(), event.getRepository(), matchingRef(event), event.getActor());
+                new BitbucketWebHookCause(event.getEventKey(), event.getRepository(), ref, event.getActor());
         ParameterizedJobMixIn<?, ?> mixIn = new ParameterizedJobMixIn() {
             @Override
             protected Job asJob() {
@@ -121,37 +87,8 @@ public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
         return mixIn.scheduleBuild2(pj.getQuietPeriod(), new CauseAction(cause)) != null;
     }
 
-    private static List<String> splitList(String value) {
-        List<String> parts = new ArrayList<>();
-        for (String part : Util.fixNull(value).split("[\\s,]+")) {
-            if (!part.isEmpty()) {
-                parts.add(part);
-            }
-        }
-        return parts;
-    }
-
-    // '*' matches any characters (including '/'), '?' matches a single character.
-    private static List<Pattern> toPatterns(String value) {
-        List<Pattern> patterns = new ArrayList<>();
-        for (String glob : splitList(value)) {
-            StringBuilder regex = new StringBuilder();
-            for (char c : glob.toCharArray()) {
-                if (c == '*') {
-                    regex.append(".*");
-                } else if (c == '?') {
-                    regex.append('.');
-                } else {
-                    regex.append(Pattern.quote(String.valueOf(c)));
-                }
-            }
-            patterns.add(Pattern.compile(regex.toString()));
-        }
-        return patterns;
-    }
-
     @Extension
-    @Symbol("bitbucketPush")
+    @Symbol("bitbucket")
     public static class DescriptorImpl extends TriggerDescriptor {
         @Override
         public boolean isApplicable(Item item) {
@@ -165,10 +102,6 @@ public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
 
         public String newSecret() {
             return generateSecret();
-        }
-
-        public String getDefaultEvents() {
-            return DEFAULT_EVENTS;
         }
 
         public String webhookUrl(Item item) {

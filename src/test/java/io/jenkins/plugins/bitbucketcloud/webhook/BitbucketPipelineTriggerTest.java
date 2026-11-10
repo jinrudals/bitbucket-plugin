@@ -20,7 +20,8 @@ class BitbucketPipelineTriggerTest {
     void pipelineDeclaredTriggerReceivesWebhook(JenkinsRule j) throws Exception {
         WorkflowJob job = j.createProject(WorkflowJob.class, "pipe");
         job.setDefinition(new CpsFlowDefinition(
-                "properties([pipelineTriggers([bitbucketPush(includeBranches: 'main', secretText: 'pipeline-secret')])])\n"
+                "properties([pipelineTriggers([bitbucket(secretText: 'pipeline-secret', "
+                        + "rules: [rule(events: 'repo:push', includeBranches: 'main')])])])\n"
                         + "echo 'hello'",
                 true));
         // The first run registers the trigger declared in the script.

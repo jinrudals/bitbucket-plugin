@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.MockAuthorizationStrategy;
@@ -107,8 +108,7 @@ class BitbucketWebHookTest {
     @Test
     void eventAndBranchFiltersSkipBuilds(JenkinsRule j) throws Exception {
         BitbucketPushTrigger trigger = new BitbucketPushTrigger();
-        trigger.setIncludeBranches("release/*");
-        trigger.setExcludeBranches("release/old*");
+        trigger.setRules(List.of(rule("repo:push", "release/*", "release/old*")));
         FreeStyleProject job = withTrigger(j.createFreeStyleProject("job"), trigger);
         String secret = trigger.getSecretText();
 
@@ -130,8 +130,7 @@ class BitbucketWebHookTest {
     @Test
     void pullRequestEventMatchesSourceBranch(JenkinsRule j) throws Exception {
         BitbucketPushTrigger trigger = new BitbucketPushTrigger();
-        trigger.setAllowedEvents("pullrequest:created");
-        trigger.setIncludeBranches("feature/*");
+        trigger.setRules(List.of(rule("pullrequest:created", "feature/*", "")));
         FreeStyleProject job = withTrigger(j.createFreeStyleProject("job"), trigger);
         String pr = "{\"pullrequest\":{\"source\":{\"branch\":{\"name\":\"feature/x\"}},"
                 + "\"destination\":{\"branch\":{\"name\":\"main\"}}}}";
@@ -155,9 +154,28 @@ class BitbucketWebHookTest {
     }
 
     @Test
-    void configRoundTripKeepsSettingsAndGeneratesSecret(JenkinsRule j) throws Exception {
+    void anyMatchingRuleTriggersTheBuild(JenkinsRule j) throws Exception {
         BitbucketPushTrigger trigger = new BitbucketPushTrigger();
-        trigger.setIncludeBranches("main");
+        trigger.setRules(List.of(rule("repo:push", "main", ""), rule("pullrequest:created", "feature/*", "")));
+        FreeStyleProject job = withTrigger(j.createFreeStyleProject("job"), trigger);
+        String secret = trigger.getSecretText();
+        String pr = "{\"pullrequest\":{\"source\":{\"branch\":{\"name\":\"feature/x\"}}}}";
+
+        assertEquals("triggered", post(j, "bitbucket/job", "repo:push", PUSH_MAIN, secret).body());
+        j.waitUntilNoActivity();
+        assertEquals("triggered", post(j, "bitbucket/job", "pullrequest:created", pr, secret).body());
+        j.waitUntilNoActivity();
+        assertTrue(post(j, "bitbucket/job", "repo:push", PUSH_MAIN.replace("main", "dev"), secret)
+                .body()
+                .startsWith("skipped"));
+        j.waitUntilNoActivity();
+        assertEquals(2, job.getLastBuild().getNumber());
+    }
+
+    @Test
+    void configRoundTripKeepsRulesAndGeneratesSecret(JenkinsRule j) throws Exception {
+        BitbucketPushTrigger trigger = new BitbucketPushTrigger();
+        trigger.setRules(List.of(rule("repo:push", "main", ""), rule("pullrequest:created", "", "wip/*")));
         trigger.setSecretText("");
         FreeStyleProject project = j.createFreeStyleProject("job");
         project.addTrigger(trigger);
@@ -166,8 +184,19 @@ class BitbucketWebHookTest {
         BitbucketPushTrigger saved = project.getTrigger(BitbucketPushTrigger.class);
 
         assertNotNull(saved);
-        assertEquals("main", saved.getIncludeBranches());
+        assertEquals(2, saved.getRules().size());
+        assertEquals("main", saved.getRules().get(0).getIncludeBranches());
+        assertEquals("pullrequest:created", saved.getRules().get(1).getEvents());
+        assertEquals("wip/*", saved.getRules().get(1).getExcludeBranches());
         assertEquals(trigger.getSecretText(), saved.getSecretText());
         assertNotEquals("", saved.getSecretText());
+    }
+
+    private static BitbucketRule rule(String events, String include, String exclude) {
+        BitbucketRule rule = new BitbucketRule();
+        rule.setEvents(events);
+        rule.setIncludeBranches(include);
+        rule.setExcludeBranches(exclude);
+        return rule;
     }
 }

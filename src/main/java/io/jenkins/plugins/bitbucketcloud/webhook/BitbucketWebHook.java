@@ -91,12 +91,12 @@ public class BitbucketWebHook implements UnprotectedRootAction {
         } catch (IOException e) {
             return HttpResponses.error(400, "Invalid JSON payload");
         }
-        String reason = trigger.rejectionReason(event);
-        if (reason != null) {
-            LOGGER.log(Level.FINE, "Skipping webhook for {0}: {1}", new Object[] {job.getFullName(), reason});
-            return HttpResponses.text("skipped: " + reason);
+        String ref = trigger.matchingRef(event);
+        if (ref == null) {
+            LOGGER.log(Level.FINE, "Skipping webhook for {0}: no rule matches", job.getFullName());
+            return HttpResponses.text("skipped: no rule matches");
         }
-        if (!trigger.schedule(event)) {
+        if (!trigger.schedule(event, ref)) {
             return HttpResponses.text("skipped: job is not buildable");
         }
         return HttpResponses.text("triggered");
