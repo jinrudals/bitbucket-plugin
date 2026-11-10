@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.jenkins-ci.plugins</groupId>
     <artifactId>plugin</artifactId>
-    <version>4.88</version>
+    <version>6.2250.va_d01d559a_209</version>
     <relativePath />
   </parent>
 
@@ -33,9 +33,9 @@
   <properties>
     <revision>1.0.0</revision>
     <changelist>-SNAPSHOT</changelist>
-    <jenkins.baseline>2.452</jenkins.baseline>
-    <jenkins.version>${jenkins.baseline}.4</jenkins.version>
-    <java.level>17</java.level>
+    <jenkins.baseline>2.580</jenkins.baseline>
+    <jenkins.version>${jenkins.baseline}.1</jenkins.version>
+    <java.level>21</java.level>
     <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
   </properties>
 
@@ -44,7 +44,7 @@
       <dependency>
         <groupId>io.jenkins.tools.bom</groupId>
         <artifactId>bom-${jenkins.baseline}.x</artifactId>
-        <version>3893.v213a_42768d35</version>
+        <version>7312.v55b_41644b_77d</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
