@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** The parts of a Bitbucket Cloud webhook delivery that the trigger cares about. */
 final class WebhookEvent {
@@ -14,8 +16,10 @@ final class WebhookEvent {
     private final String repository;
     private final String actor;
     private final List<String> refs;
+    private final JsonNode root;
 
-    private WebhookEvent(String eventKey, String repository, String actor, List<String> refs) {
+    private WebhookEvent(String eventKey, String repository, String actor, List<String> refs, JsonNode root) {
+        this.root = root;
         this.eventKey = eventKey;
         this.repository = repository;
         this.actor = actor;
@@ -31,7 +35,8 @@ final class WebhookEvent {
                 eventKey,
                 root.path("repository").path("full_name").asText(""),
                 root.path("actor").path("display_name").asText(""),
-                extractRefs(eventKey, root));
+                extractRefs(eventKey, root),
+                root);
     }
 
     // Push events list every changed ref; deletions have no "new" side and are ignored.
@@ -52,6 +57,60 @@ final class WebhookEvent {
             }
         }
         return refs;
+    }
+
+    /** Environment variables exposed to the build; values missing from the payload are empty strings. */
+    Map<String, String> environment(String ref) {
+        Map<String, String> env = new LinkedHashMap<>();
+        env.put("BITBUCKET_EVENT_KEY", eventKey);
+        JsonNode repo = root.path("repository");
+        String fullName = repo.path("full_name").asText("");
+        env.put("BITBUCKET_REPOSITORY", fullName);
+        env.put("BITBUCKET_REPOSITORY_NAME", repo.path("name").asText(""));
+        String workspace = repo.path("workspace").path("slug").asText("");
+        if (workspace.isEmpty() && fullName.contains("/")) {
+            workspace = fullName.substring(0, fullName.indexOf('/'));
+        }
+        env.put("BITBUCKET_WORKSPACE", workspace);
+        env.put("BITBUCKET_REPOSITORY_URL", repo.path("links").path("html").path("href").asText(""));
+        // The payload carries no clone links, so the SSH URL is derived from the repository name.
+        env.put("BITBUCKET_REPO_SSH_URL", fullName.isEmpty() ? "" : "git@ssh.bitbucket.org:" + fullName + ".git");
+        env.put("BITBUCKET_ACTOR", actor);
+        env.put("BITBUCKET_ACTOR_ACCOUNT_ID", root.path("actor").path("account_id").asText(""));
+        env.put("BITBUCKET_REF", ref == null ? "" : ref);
+        if (eventKey.startsWith("pullrequest:")) {
+            addPullRequest(env, root.path("pullrequest"));
+            env.put("BITBUCKET_PR_COMMENT", root.path("comment").path("content").path("raw").asText(""));
+        } else if (eventKey.equals("repo:push")) {
+            addPush(env, ref);
+        }
+        return env;
+    }
+
+    private void addPush(Map<String, String> env, String ref) {
+        JsonNode match = null;
+        for (JsonNode change : root.path("push").path("changes")) {
+            if (ref != null && ref.equals(change.path("new").path("name").asText(""))) {
+                match = change;
+                break;
+            }
+        }
+        JsonNode change = match == null ? root.path("push").path("changes").path(0) : match;
+        env.put("BITBUCKET_REF_TYPE", change.path("new").path("type").asText(""));
+        env.put("BITBUCKET_COMMIT_BEFORE", change.path("old").path("target").path("hash").asText(""));
+        env.put("BITBUCKET_COMMIT_AFTER", change.path("new").path("target").path("hash").asText(""));
+        env.put("BITBUCKET_COMMIT_MESSAGE", change.path("new").path("target").path("message").asText(""));
+    }
+
+    private static void addPullRequest(Map<String, String> env, JsonNode pr) {
+        env.put("BITBUCKET_PR_ID", pr.path("id").asText(""));
+        env.put("BITBUCKET_PR_TITLE", pr.path("title").asText(""));
+        env.put("BITBUCKET_PR_STATE", pr.path("state").asText(""));
+        env.put("BITBUCKET_PR_URL", pr.path("links").path("html").path("href").asText(""));
+        env.put("BITBUCKET_PR_SOURCE_BRANCH", pr.path("source").path("branch").path("name").asText(""));
+        env.put("BITBUCKET_PR_SOURCE_COMMIT", pr.path("source").path("commit").path("hash").asText(""));
+        env.put("BITBUCKET_PR_TARGET_BRANCH", pr.path("destination").path("branch").path("name").asText(""));
+        env.put("BITBUCKET_PR_AUTHOR", pr.path("author").path("display_name").asText(""));
     }
 
     String getEventKey() {

@@ -84,7 +84,8 @@ public class BitbucketPushTrigger extends Trigger<Job<?, ?>> {
                 return job;
             }
         };
-        return mixIn.scheduleBuild2(pj.getQuietPeriod(), new CauseAction(cause)) != null;
+        return mixIn.scheduleBuild2(
+                        pj.getQuietPeriod(), new CauseAction(cause), new BitbucketEnvAction(event.environment(ref))) != null;
     }
 
     @Extension
