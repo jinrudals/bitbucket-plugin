@@ -1,6 +1,7 @@
 package io.jenkins.plugins.bitbucketcloud.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuth;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketWorkspaceConnection;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.regex.Pattern;
 
@@ -22,6 +24,7 @@ public final class BitbucketWorkspaceClient {
     private static final URI DEFAULT_API_BASE_URI = URI.create("https://api.bitbucket.org");
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
     private static final Pattern COMMIT_HASH = Pattern.compile("^[0-9a-fA-F]{7,64}$");
+    private static final Pattern NUMERIC_ID = Pattern.compile("^[0-9]{1,18}$");
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final URI apiBaseUri;
@@ -83,6 +86,72 @@ public final class BitbucketWorkspaceClient {
         return new CommitStatusResult(result.outcome(), result.httpStatus());
     }
 
+    /**
+     * Creates a comment thread (optionally as a reply to {@code parentId}) or a task on a pull request.
+     * The id of the created item is returned when Bitbucket reports it.
+     */
+    public PullRequestItemResult postPullRequestItem(
+            String workspace,
+            String repo,
+            String pullRequestId,
+            PullRequestItemType type,
+            String content,
+            String parentId,
+            BitbucketAuth auth) {
+        Objects.requireNonNull(type);
+        Objects.requireNonNull(auth);
+        if (!BitbucketWorkspaceConnection.isValidWorkspaceSlug(workspace)
+                || !BitbucketWorkspaceConnection.isValidWorkspaceSlug(repo)) {
+            throw new IllegalArgumentException("Invalid Bitbucket Cloud workspace or repository slug.");
+        }
+        if (pullRequestId == null || !NUMERIC_ID.matcher(pullRequestId.trim()).matches()) {
+            throw new IllegalArgumentException("Invalid pull request id.");
+        }
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("The content must not be empty.");
+        }
+        boolean hasParent = parentId != null && !parentId.isBlank();
+        if (hasParent && type == PullRequestItemType.TASK) {
+            throw new IllegalArgumentException("A task cannot be a reply; parentId applies to threads only.");
+        }
+        if (hasParent && !NUMERIC_ID.matcher(parentId.trim()).matches()) {
+            throw new IllegalArgumentException("Invalid parent comment id.");
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("content", Map.of("raw", content));
+        if (hasParent) {
+            body.put("parent", Map.of("id", Long.parseLong(parentId.trim())));
+        }
+        String json;
+        try {
+            json = JSON.writeValueAsString(body);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Cannot serialize pull request item.", e);
+        }
+
+        URI uri = apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim() + "/pullrequests/"
+                + pullRequestId.trim() + (type == PullRequestItemType.TASK ? "/tasks" : "/comments"));
+        HttpRequest.Builder request = HttpRequest.newBuilder(uri)
+                .timeout(requestTimeout)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
+        Response response = exchange(request, auth);
+        return new PullRequestItemResult(response.outcome(), response.httpStatus(), parseId(response.body()));
+    }
+
+    private static Optional<String> parseId(String body) {
+        if (body == null || body.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode id = JSON.readTree(body).path("id");
+            return id.isMissingNode() || id.isNull() ? Optional.empty() : Optional.of(id.asText());
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
     private static void putIfPresent(Map<String, String> body, String key, String value) {
         if (value != null && !value.isBlank()) {
             body.put(key, value);
@@ -94,42 +163,49 @@ public final class BitbucketWorkspaceClient {
     }
 
     private WorkspaceTestResult send(HttpRequest.Builder request, BitbucketAuth auth) {
+        Response response = exchange(request, auth);
+        return new WorkspaceTestResult(response.outcome(), response.httpStatus());
+    }
+
+    private Response exchange(HttpRequest.Builder request, BitbucketAuth auth) {
         try {
             auth.applyTo(request);
-            int status = http.send(request.build(), HttpResponse.BodyHandlers.discarding())
-                    .statusCode();
+            HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
             if (status >= 200 && status < 300) {
-                return result(Outcome.SUCCESS, status);
+                return response(Outcome.SUCCESS, status, response.body());
             }
             if (status == 401) {
-                return result(Outcome.UNAUTHORIZED, status);
+                return response(Outcome.UNAUTHORIZED, status, null);
             }
             if (status == 403) {
-                return result(Outcome.FORBIDDEN, status);
+                return response(Outcome.FORBIDDEN, status, null);
             }
             if (status == 404) {
-                return result(Outcome.NOT_FOUND, status);
+                return response(Outcome.NOT_FOUND, status, null);
             }
-            return result(Outcome.HTTP_ERROR, status);
+            return response(Outcome.HTTP_ERROR, status, null);
         } catch (HttpTimeoutException e) {
-            return result(Outcome.TIMEOUT);
+            return response(Outcome.TIMEOUT);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return result(Outcome.INTERRUPTED);
+            return response(Outcome.INTERRUPTED);
         } catch (IOException e) {
-            return result(Outcome.NETWORK_ERROR);
+            return response(Outcome.NETWORK_ERROR);
         } catch (IllegalStateException e) {
-            return result(Outcome.AUTHENTICATION_ERROR);
+            return response(Outcome.AUTHENTICATION_ERROR);
         }
     }
 
-    private static WorkspaceTestResult result(Outcome outcome, int status) {
-        return new WorkspaceTestResult(outcome, OptionalInt.of(status));
+    private static Response response(Outcome outcome, int status, String body) {
+        return new Response(outcome, OptionalInt.of(status), body);
     }
 
-    private static WorkspaceTestResult result(Outcome outcome) {
-        return new WorkspaceTestResult(outcome, OptionalInt.empty());
+    private static Response response(Outcome outcome) {
+        return new Response(outcome, OptionalInt.empty(), null);
     }
+
+    private record Response(Outcome outcome, OptionalInt httpStatus, String body) {}
 
     public enum Outcome {
         SUCCESS,
@@ -154,6 +230,14 @@ public final class BitbucketWorkspaceClient {
         public CommitStatusResult {
             Objects.requireNonNull(outcome);
             Objects.requireNonNull(httpStatus);
+        }
+    }
+
+    public record PullRequestItemResult(Outcome outcome, OptionalInt httpStatus, Optional<String> id) {
+        public PullRequestItemResult {
+            Objects.requireNonNull(outcome);
+            Objects.requireNonNull(httpStatus);
+            Objects.requireNonNull(id);
         }
     }
 }
