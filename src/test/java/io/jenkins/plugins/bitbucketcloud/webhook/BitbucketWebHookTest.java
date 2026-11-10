@@ -74,7 +74,7 @@ class BitbucketWebHookTest {
         hudson.EnvVars env = job.getLastBuild().getEnvironment(hudson.model.TaskListener.NULL);
         assertEquals("repo:push", env.get("BITBUCKET_EVENT_KEY"));
         assertEquals("ws", env.get("BITBUCKET_WORKSPACE"));
-        assertEquals("git@bitbucket.org:ws/repo.git", env.get("BITBUCKET_REPO_SSH_URL"));
+        assertEquals("git@ssh.bitbucket.org:ws/repo.git", env.get("BITBUCKET_REPO_SSH_URL"));
         assertEquals("repo", env.get("BITBUCKET_REPOSITORY_NAME"));
         assertEquals("acc-1", env.get("BITBUCKET_ACTOR_ACCOUNT_ID"));
         assertEquals("main", env.get("BITBUCKET_REF"));

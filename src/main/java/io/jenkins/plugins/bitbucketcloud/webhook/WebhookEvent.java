@@ -74,7 +74,7 @@ final class WebhookEvent {
         env.put("BITBUCKET_WORKSPACE", workspace);
         env.put("BITBUCKET_REPOSITORY_URL", repo.path("links").path("html").path("href").asText(""));
         // The payload carries no clone links, so the SSH URL is derived from the repository name.
-        env.put("BITBUCKET_REPO_SSH_URL", fullName.isEmpty() ? "" : "git@bitbucket.org:" + fullName + ".git");
+        env.put("BITBUCKET_REPO_SSH_URL", fullName.isEmpty() ? "" : "git@ssh.bitbucket.org:" + fullName + ".git");
         env.put("BITBUCKET_ACTOR", actor);
         env.put("BITBUCKET_ACTOR_ACCOUNT_ID", root.path("actor").path("account_id").asText(""));
         env.put("BITBUCKET_REF", ref == null ? "" : ref);
