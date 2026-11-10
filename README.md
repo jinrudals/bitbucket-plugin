@@ -31,6 +31,10 @@ Each job receives Bitbucket Cloud webhooks on its own URL, so a delivery can onl
    (default `repo:push`; e.g. `pullrequest:created`) and **Include / Exclude branches** (space-separated wildcards;
    pull request events are matched on the source branch). Without rules, pushes to any branch build the job.
 
+The secret can also come from a Jenkins **Secret text** credential (`secretCredentialsId`), which replaces the generated
+secret and is recommended when the trigger is declared in a Jenkinsfile, where a generated secret would change on every
+run. A credential that cannot be found makes every delivery fail with 403.
+
 Deliveries are verified with the `X-Hub-Signature` HMAC-SHA256 header. Unknown jobs return 404, bad signatures 403, and
 deliveries that match no rule return 200 with a `skipped: ...` body without scheduling a build.
 

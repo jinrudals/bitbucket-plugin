@@ -3,6 +3,10 @@ package io.jenkins.plugins.bitbucketcloud.webhook;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.cloudbees.plugins.credentials.CredentialsScope;
+import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
+import hudson.util.Secret;
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,21 +55,18 @@ class BitbucketPipelineTriggerTest {
 
     @Test
     void exampleJenkinsfileRunsWithWebhookEnvironment(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance().getCredentials().add(new StringCredentialsImpl(
+                CredentialsScope.GLOBAL, "bitbucket-webhook-secret", "test", Secret.fromString("example-secret")));
         WorkflowJob job = j.createProject(WorkflowJob.class, "example");
         job.setDefinition(new CpsFlowDefinition(Files.readString(Path.of("docs/examples/Jenkinsfile")), true));
         j.buildAndAssertSuccess(job);
-        BitbucketPushTrigger trigger = job.getTriggers().values().stream()
-                .filter(BitbucketPushTrigger.class::isInstance)
-                .map(BitbucketPushTrigger.class::cast)
-                .findFirst()
-                .orElseThrow();
 
         String body = "{\"repository\":{\"full_name\":\"ws/repo\"},"
                 + "\"push\":{\"changes\":[{\"new\":{\"type\":\"branch\",\"name\":\"main\"}}]}}";
         HttpRequest request = HttpRequest.newBuilder(URI.create(j.getURL() + "bitbucket/example"))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .header("X-Event-Key", "repo:push")
-                .header("X-Hub-Signature", SignatureVerifier.sign(trigger.getSecretText(), body.getBytes(StandardCharsets.UTF_8)))
+                .header("X-Hub-Signature", SignatureVerifier.sign("example-secret", body.getBytes(StandardCharsets.UTF_8)))
                 .build();
         assertEquals("triggered", HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).body());
         j.waitUntilNoActivity();

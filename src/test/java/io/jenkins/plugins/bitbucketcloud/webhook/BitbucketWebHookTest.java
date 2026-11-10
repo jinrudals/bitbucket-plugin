@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cloudbees.hudson.plugins.folder.Folder;
+import com.cloudbees.plugins.credentials.CredentialsScope;
+import com.cloudbees.plugins.credentials.SystemCredentialsProvider;
+import hudson.util.Secret;
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import hudson.model.FreeStyleProject;
 import java.net.URI;
 import jenkins.model.Jenkins;
@@ -124,6 +128,23 @@ class BitbucketWebHookTest {
 
         // The identical repeated delivery is folded; the different payload is not.
         assertEquals(2, j.jenkins.getQueue().getItems(job).size());
+    }
+
+    @Test
+    void secretIsReadFromCredentialAndFailsClosedWhenMissing(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance().getCredentials().add(new StringCredentialsImpl(
+                CredentialsScope.GLOBAL, "hook-secret", "test", Secret.fromString("from-credential")));
+        BitbucketPushTrigger trigger = new BitbucketPushTrigger();
+        trigger.setSecretCredentialsId("hook-secret");
+        FreeStyleProject job = withTrigger(j.createFreeStyleProject("cred"), trigger);
+
+        assertEquals("triggered", post(j, "bitbucket/cred", "repo:push", PUSH_MAIN, "from-credential").body());
+        j.waitUntilNoActivity();
+        assertNotNull(job.getLastBuild());
+        assertEquals(403, post(j, "bitbucket/cred", "repo:push", PUSH_MAIN, trigger.getSecretText()).statusCode());
+
+        trigger.setSecretCredentialsId("missing");
+        assertEquals(403, post(j, "bitbucket/cred", "repo:push", PUSH_MAIN, "from-credential").statusCode());
     }
 
     @Test
