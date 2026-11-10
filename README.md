@@ -55,13 +55,57 @@ Job DSL:
 
 ### Environment variables
 
-Builds triggered by a webhook get these variables (empty when absent from the payload):
+Builds triggered by a webhook get the variables below. A variable whose value is missing from the payload is set to an
+empty string. Event-specific variables are only defined for their event type (for example `BITBUCKET_PR_ID` does not
+exist in a `repo:push` build). Other events, such as `repo:fork`, only get the common variables.
 
-| Scope | Variables |
+Each variable is read from the Bitbucket Cloud webhook payload, except `BITBUCKET_REPO_SSH_URL` and, when the payload has
+no workspace slug, `BITBUCKET_WORKSPACE`, which are derived from `repository.full_name`.
+
+**Common (all events)**
+
+| Variable | Description | Example |
+|---|---|---|
+| `BITBUCKET_EVENT_KEY` | Value of the `X-Event-Key` header: the event that triggered the build. | `repo:push` |
+| `BITBUCKET_REPOSITORY` | Full repository name, `<workspace>/<repo>`. | `acme/shop` |
+| `BITBUCKET_REPOSITORY_NAME` | Repository name without the workspace. | `shop` |
+| `BITBUCKET_WORKSPACE` | Workspace slug. | `acme` |
+| `BITBUCKET_REPOSITORY_URL` | Web (HTML) URL of the repository. | `https://bitbucket.org/acme/shop` |
+| `BITBUCKET_REPO_SSH_URL` | SSH clone URL, built as `git@ssh.bitbucket.org:<workspace>/<repo>.git` (the payload carries no clone links). | `git@ssh.bitbucket.org:acme/shop.git` |
+| `BITBUCKET_ACTOR` | Display name of the user who caused the event. | `Jane Doe` |
+| `BITBUCKET_ACTOR_ACCOUNT_ID` | Atlassian account ID of that user. | `712020:495d...` |
+| `BITBUCKET_REF` | The ref that satisfied the matching rule: the pushed branch or tag name for `repo:push`, or the pull request source branch for `pullrequest:*`. | `main` |
+
+**`repo:push` only**
+
+The values come from the pushed change that matches `BITBUCKET_REF`. A push can contain several changes; the build is
+started for the first one that a rule accepts.
+
+| Variable | Description |
 |---|---|
-| All events | `BITBUCKET_EVENT_KEY`, `BITBUCKET_REPOSITORY` (`workspace/repo`), `BITBUCKET_REPOSITORY_NAME`, `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_URL`, `BITBUCKET_REPO_SSH_URL` (`git@ssh.bitbucket.org:workspace/repo.git`), `BITBUCKET_ACTOR`, `BITBUCKET_ACTOR_ACCOUNT_ID`, `BITBUCKET_REF` (the matched branch/tag) |
-| `repo:push` | `BITBUCKET_REF_TYPE`, `BITBUCKET_COMMIT_BEFORE`, `BITBUCKET_COMMIT_AFTER`, `BITBUCKET_COMMIT_MESSAGE` |
-| `pullrequest:*` | `BITBUCKET_PR_ID`, `BITBUCKET_PR_TITLE`, `BITBUCKET_PR_STATE`, `BITBUCKET_PR_URL`, `BITBUCKET_PR_SOURCE_BRANCH`, `BITBUCKET_PR_SOURCE_COMMIT`, `BITBUCKET_PR_TARGET_BRANCH`, `BITBUCKET_PR_AUTHOR`, `BITBUCKET_PR_COMMENT` |
+| `BITBUCKET_REF_TYPE` | Type of the pushed ref: `branch` or `tag`. |
+| `BITBUCKET_COMMIT_BEFORE` | Commit hash the ref pointed to before the push. Empty when the ref is new. |
+| `BITBUCKET_COMMIT_AFTER` | Commit hash the ref points to after the push (the new head). |
+| `BITBUCKET_COMMIT_MESSAGE` | Message of the new head commit. |
+
+**`pullrequest:*` only**
+
+| Variable | Description |
+|---|---|
+| `BITBUCKET_PR_ID` | Pull request number. |
+| `BITBUCKET_PR_TITLE` | Pull request title. |
+| `BITBUCKET_PR_STATE` | Pull request state, such as `OPEN`, `MERGED` or `DECLINED`. |
+| `BITBUCKET_PR_URL` | Web (HTML) URL of the pull request. |
+| `BITBUCKET_PR_SOURCE_BRANCH` | Branch the pull request is merged from. Same as `BITBUCKET_REF`. |
+| `BITBUCKET_PR_SOURCE_COMMIT` | Head commit hash of the source branch. |
+| `BITBUCKET_PR_TARGET_BRANCH` | Branch the pull request is merged into. |
+| `BITBUCKET_PR_AUTHOR` | Display name of the pull request author, which can differ from `BITBUCKET_ACTOR`. |
+| `BITBUCKET_PR_COMMENT` | Text of the comment for comment events (`pullrequest:comment_*`); empty for other pull request events. |
+
+**Builds are not merged across different deliveries.** Bitbucket sends both `repo:push` and `pullrequest:updated` when
+you push to a pull request branch. If both match a rule, they start two builds (one per event), each with its own
+variables. Identical repeated deliveries are folded into one queued build. To get one build per update, select only one
+of the two events in your rules.
 
 A full example Jenkinsfile (trigger rules plus every environment variable) is in [docs/examples/Jenkinsfile](docs/examples/Jenkinsfile).
 
