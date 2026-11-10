@@ -170,6 +170,22 @@ commentOnBitbucketPullRequest content: 'Update the changelog.', type: 'TASK'
 | `pullRequestId` | Pull request number. | `BITBUCKET_PR_ID` |
 | `workspace`, `repo` | Repository of the pull request. | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` |
 
+## Reading a file from a pipeline
+
+`readFileFromBitbucket` returns the text of a file at a branch or commit, or `null` if the file or ref does not
+exist (or the API call failed; a warning is logged). The API token needs repository read permission.
+
+```groovy
+def text = readFileFromBitbucket path: 'config/app.yaml', ref: 'main'
+def pinned = readFileFromBitbucket path: 'Jenkinsfile', ref: '0a1b2c3d4e5f'
+```
+
+| Argument | Description | Default |
+| --- | --- | --- |
+| `path` (required) | File path in the repository. | |
+| `ref` (required) | Branch name or commit hash. | |
+| `workspace`, `repo` | Repository to read. | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` |
+
 Arguments you do not pass are resolved from the first of these sources that provides all of them, so values from
 different sources are never mixed: the `BitbucketEnvAction` of the build, then the `BITBUCKET_*` environment variables.
 The build log names the source that was used. A missing
