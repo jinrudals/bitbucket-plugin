@@ -109,6 +109,42 @@ of the two events in your rules.
 
 A full example Jenkinsfile (trigger rules plus every environment variable) is in [docs/examples/Jenkinsfile](docs/examples/Jenkinsfile).
 
+## Commit status from a pipeline
+
+Two pipeline steps publish build statuses to Bitbucket Cloud. The workspace must be configured under
+**Manage Jenkins → System → Bitbucket Cloud**; its credential is used for the request and its API token needs
+permission to write commit statuses. Credentials are never passed as step arguments.
+
+```groovy
+// Publish one state.
+updateBitbucketCommitStatus state: 'INPROGRESS'
+
+// Wrap a block: INPROGRESS on start, then SUCCESSFUL, FAILED (error) or STOPPED (aborted).
+bitbucketCommitStatus(name: 'build') {
+    sh 'make'
+}
+```
+
+| Argument | Applies to | Description | Default |
+| --- | --- | --- | --- |
+| `state` | `updateBitbucketCommitStatus` (required) | `INPROGRESS`, `SUCCESSFUL`, `FAILED` or `STOPPED`. | |
+| `name` | both | Display name of the status. | `JOB_NAME` |
+| `key` | both | Unique key of the status (max 40 characters). | `JOB_NAME`, shortened with a hash if longer than 40 characters |
+| `description` | both | Short description. | none |
+| `url` | both | Link shown with the status. | `BUILD_URL` |
+| `workspace`, `repo`, `commit` | both | Commit to publish to. | resolved, see below |
+
+Fields you do not pass are resolved from the first of these sources that provides all of them, so values from
+different sources are never mixed. The build log names the source that was used.
+
+1. The `BitbucketEnvAction` of the build (builds started by a webhook).
+2. The `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` and `BITBUCKET_COMMIT_AFTER` (push) or
+   `BITBUCKET_PR_SOURCE_COMMIT` (pull request) environment variables. Child builds get them from `setParentEnv`.
+3. The Git SCM: `GIT_URL` (a `bitbucket.org` URL) and `GIT_COMMIT`.
+
+A missing configuration, an unresolvable commit or an unknown `state` fails the step. A failing Bitbucket API call
+(for example HTTP 403) only prints a warning and does not fail the build.
+
 ## Build
 
     mvn verify
