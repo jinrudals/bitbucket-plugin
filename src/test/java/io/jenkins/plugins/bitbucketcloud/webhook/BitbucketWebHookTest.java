@@ -108,6 +108,25 @@ class BitbucketWebHookTest {
     }
 
     @Test
+    void queuedDeliveriesWithDifferentPayloadsAreNotMerged(JenkinsRule j) throws Exception {
+        BitbucketRule rule = new BitbucketRule();
+        rule.setEvents("repo:push pullrequest:updated");
+        BitbucketPushTrigger trigger = new BitbucketPushTrigger();
+        trigger.setRules(List.of(rule));
+        FreeStyleProject job = withTrigger(j.createFreeStyleProject("merge"), trigger);
+        job.setQuietPeriod(60);
+        String pr = "{\"repository\":{\"full_name\":\"ws/repo\"},"
+                + "\"pullrequest\":{\"id\":7,\"source\":{\"branch\":{\"name\":\"feat\"}}}}";
+
+        post(j, "bitbucket/merge", "repo:push", PUSH_MAIN, trigger.getSecretText());
+        post(j, "bitbucket/merge", "pullrequest:updated", pr, trigger.getSecretText());
+        post(j, "bitbucket/merge", "pullrequest:updated", pr, trigger.getSecretText());
+
+        // The identical repeated delivery is folded; the different payload is not.
+        assertEquals(2, j.jenkins.getQueue().getItems(job).size());
+    }
+
+    @Test
     void resolvesJobInsideNestedFolders(JenkinsRule j) throws Exception {
         Folder outer = j.jenkins.createProject(Folder.class, "outer");
         Folder inner = outer.createProject(Folder.class, "inner");
