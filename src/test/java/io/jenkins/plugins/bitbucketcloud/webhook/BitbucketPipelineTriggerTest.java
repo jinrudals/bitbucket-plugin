@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -45,5 +47,31 @@ class BitbucketPipelineTriggerTest {
         j.waitUntilNoActivity();
         assertEquals(2, job.getLastBuild().getNumber());
         assertNotNull(job.getLastBuild().getCause(BitbucketWebHookCause.class));
+    }
+
+    @Test
+    void exampleJenkinsfileRunsWithWebhookEnvironment(JenkinsRule j) throws Exception {
+        WorkflowJob job = j.createProject(WorkflowJob.class, "example");
+        job.setDefinition(new CpsFlowDefinition(Files.readString(Path.of("docs/examples/Jenkinsfile")), true));
+        j.buildAndAssertSuccess(job);
+        BitbucketPushTrigger trigger = job.getTriggers().values().stream()
+                .filter(BitbucketPushTrigger.class::isInstance)
+                .map(BitbucketPushTrigger.class::cast)
+                .findFirst()
+                .orElseThrow();
+
+        String body = "{\"repository\":{\"full_name\":\"ws/repo\"},"
+                + "\"push\":{\"changes\":[{\"new\":{\"type\":\"branch\",\"name\":\"main\"}}]}}";
+        HttpRequest request = HttpRequest.newBuilder(URI.create(j.getURL() + "bitbucket/example"))
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .header("X-Event-Key", "repo:push")
+                .header("X-Hub-Signature", SignatureVerifier.sign(trigger.getSecretText(), body.getBytes(StandardCharsets.UTF_8)))
+                .build();
+        assertEquals("triggered", HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).body());
+        j.waitUntilNoActivity();
+
+        j.assertLogContains("Event:      repo:push", job.getLastBuild());
+        j.assertLogContains("SSH URL:    git@ssh.bitbucket.org:ws/repo.git", job.getLastBuild());
+        j.assertLogContains("Ref type: branch", job.getLastBuild());
     }
 }
