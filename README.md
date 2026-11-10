@@ -170,7 +170,9 @@ commentOnBitbucketPullRequest content: 'Update the changelog.', type: 'TASK'
 | `pullRequestId` | Pull request number. | `BITBUCKET_PR_ID` |
 | `workspace`, `repo` | Repository of the pull request. | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` |
 
-Unset arguments are read from the `BitbucketEnvAction` of the build, then from the environment variables. A missing
+Arguments you do not pass are resolved from the first of these sources that provides all of them, so values from
+different sources are never mixed: the `BitbucketEnvAction` of the build, then the `BITBUCKET_*` environment variables.
+The build log names the source that was used. A missing
 configuration, an unresolvable pull request, an unknown `type` or a `parentId` on a task fails the step. A failing
 Bitbucket API call only prints a warning. Inline comments and resolving items are not supported.
 

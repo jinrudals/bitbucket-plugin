@@ -12,9 +12,11 @@ import io.jenkins.plugins.bitbucketcloud.api.BitbucketWorkspaceClient;
 import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuthenticationCredentials;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketGlobalConfig;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketWorkspaceConnection;
+import io.jenkins.plugins.bitbucketcloud.webhook.BitbucketEnvAction;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
 import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.junit.jupiter.api.AfterEach;
@@ -96,6 +98,25 @@ class PullRequestCommentStepTest {
     }
 
     @Test
+    void takesAllOpenFieldsFromTheFirstCompleteSource(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+        configure(wm);
+        var job = job(
+                j,
+                "withEnv(['BITBUCKET_WORKSPACE=other','BITBUCKET_PR_ID=99']) {"
+                        + " commentOnBitbucketPullRequest content: 'x' }");
+
+        var build = j.assertBuildStatusSuccess(job.scheduleBuild2(
+                        0,
+                        new BitbucketEnvAction(Map.of(
+                                "BITBUCKET_WORKSPACE", "acme",
+                                "BITBUCKET_REPOSITORY_NAME", "shop",
+                                "BITBUCKET_PR_ID", "12"))));
+
+        j.assertLogContains("BitbucketEnvAction", build);
+        verify(1, postRequestedFor(urlEqualTo(COMMENTS)));
+    }
+
+    @Test
     void missingPullRequestIdFailsTheBuild(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
         configure(wm);
 
@@ -104,7 +125,7 @@ class PullRequestCommentStepTest {
                 job(j, "commentOnBitbucketPullRequest content: 'x', workspace: 'acme', repo: 'shop'")
                         .scheduleBuild2(0));
 
-        j.assertLogContains("pull request", build);
+        j.assertLogContains("pullRequestId", build);
         verify(0, postRequestedFor(urlEqualTo(COMMENTS)));
     }
 
