@@ -60,6 +60,53 @@ class BitbucketWebHookTest {
     }
 
     @Test
+    void pushPayloadValuesAreExposedAsEnvironmentVariables(JenkinsRule j) throws Exception {
+        BitbucketPushTrigger trigger = new BitbucketPushTrigger();
+        FreeStyleProject job = withTrigger(j.createFreeStyleProject("env"), trigger);
+        String body = "{\"actor\":{\"display_name\":\"Dev\",\"account_id\":\"acc-1\"},"
+                + "\"repository\":{\"full_name\":\"ws/repo\",\"name\":\"repo\"},"
+                + "\"push\":{\"changes\":[{\"old\":{\"target\":{\"hash\":\"aaa\"}},"
+                + "\"new\":{\"type\":\"branch\",\"name\":\"main\",\"target\":{\"hash\":\"bbb\",\"message\":\"msg\"}}}]}}";
+
+        post(j, "bitbucket/env", "repo:push", body, trigger.getSecretText());
+        j.waitUntilNoActivity();
+
+        hudson.EnvVars env = job.getLastBuild().getEnvironment(hudson.model.TaskListener.NULL);
+        assertEquals("repo:push", env.get("BITBUCKET_EVENT_KEY"));
+        assertEquals("ws", env.get("BITBUCKET_WORKSPACE"));
+        assertEquals("repo", env.get("BITBUCKET_REPOSITORY_NAME"));
+        assertEquals("acc-1", env.get("BITBUCKET_ACTOR_ACCOUNT_ID"));
+        assertEquals("main", env.get("BITBUCKET_REF"));
+        assertEquals("branch", env.get("BITBUCKET_REF_TYPE"));
+        assertEquals("aaa", env.get("BITBUCKET_COMMIT_BEFORE"));
+        assertEquals("bbb", env.get("BITBUCKET_COMMIT_AFTER"));
+        assertEquals("msg", env.get("BITBUCKET_COMMIT_MESSAGE"));
+    }
+
+    @Test
+    void pullRequestPayloadValuesAreExposedAsEnvironmentVariables(JenkinsRule j) throws Exception {
+        BitbucketRule rule = new BitbucketRule();
+        rule.setEvents("pullrequest:created");
+        BitbucketPushTrigger trigger = new BitbucketPushTrigger();
+        trigger.setRules(List.of(rule));
+        FreeStyleProject job = withTrigger(j.createFreeStyleProject("pr"), trigger);
+        String body = "{\"repository\":{\"full_name\":\"ws/repo\"},\"comment\":{\"content\":{\"raw\":\"hi\"}},"
+                + "\"pullrequest\":{\"id\":7,\"title\":\"T\",\"state\":\"OPEN\",\"author\":{\"display_name\":\"A\"},"
+                + "\"source\":{\"branch\":{\"name\":\"feat\"},\"commit\":{\"hash\":\"abc\"}},"
+                + "\"destination\":{\"branch\":{\"name\":\"main\"}}}}";
+
+        post(j, "bitbucket/pr", "pullrequest:created", body, trigger.getSecretText());
+        j.waitUntilNoActivity();
+
+        hudson.EnvVars env = job.getLastBuild().getEnvironment(hudson.model.TaskListener.NULL);
+        assertEquals("7", env.get("BITBUCKET_PR_ID"));
+        assertEquals("feat", env.get("BITBUCKET_PR_SOURCE_BRANCH"));
+        assertEquals("main", env.get("BITBUCKET_PR_TARGET_BRANCH"));
+        assertEquals("abc", env.get("BITBUCKET_PR_SOURCE_COMMIT"));
+        assertEquals("hi", env.get("BITBUCKET_PR_COMMENT"));
+    }
+
+    @Test
     void resolvesJobInsideNestedFolders(JenkinsRule j) throws Exception {
         Folder outer = j.jenkins.createProject(Folder.class, "outer");
         Folder inner = outer.createProject(Folder.class, "inner");
