@@ -15,16 +15,16 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.StaplerRequest2;
+import org.kohsuke.stapler.StaplerResponse2;
 
 /**
  * Receives Bitbucket Cloud webhooks at {@code /bitbucket/<folder>/<job>}; the path alone selects the one job to build.
@@ -52,11 +52,11 @@ public class BitbucketWebHook implements UnprotectedRootAction {
     }
 
     // A web method (rather than getDynamic) so that Stapler treats the response as served and adds no redirect.
-    public void doDynamic(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
+    public void doDynamic(StaplerRequest2 req, StaplerResponse2 rsp) throws IOException, ServletException {
         handle(req).generateResponse(req, rsp, this);
     }
 
-    private HttpResponse handle(StaplerRequest req) throws IOException {
+    private HttpResponse handle(StaplerRequest2 req) throws IOException {
         Iterator<String> rest = Arrays.stream(req.getRestOfPath().split("/"))
                 .filter(s -> !s.isEmpty())
                 .iterator();
