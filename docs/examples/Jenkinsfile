@@ -1,14 +1,15 @@
-// Example Jenkinsfile using the Bitbucket Cloud plugin (Declarative Pipeline).
+// Example Jenkinsfile using the Bitbucket Cloud plugin (Scripted Pipeline).
+// Scripted syntax needs only workflow-cps (no `stage` step, so the sections are echoed); Declarative Pipeline works the same way
+// (put the bitbucket(...) trigger inside `triggers { }`) but needs pipeline-model-definition.
 //
 // 1. Run the job once manually so Jenkins registers the trigger from this file.
-// 2. Open the job configuration, copy the webhook URL and generated secret
-//    (<JENKINS_ROOT_URL>/bitbucket/<folder>/<job>) into Bitbucket Cloud
-//    (Repository settings -> Webhooks) and select the events used below.
+// 2. Copy the webhook URL (<JENKINS_ROOT_URL>/bitbucket/<folder>/<job>) and the secret into
+//    Bitbucket Cloud (Repository settings -> Webhooks) and select the events used below.
+//    A trigger declared here gets a new random secret on every run unless you pin it with
+//    secretText: '...' inside bitbucket(...).
 
-pipeline {
-    agent any
-
-    triggers {
+properties([
+    pipelineTriggers([
         // Rules are OR'ed: the job builds when any rule matches the delivery.
         bitbucket(rules: [
             // Pushes to main or release branches, except WIP branches.
@@ -18,51 +19,34 @@ pipeline {
             // Merged pull requests.
             rule(events: 'pullrequest:fulfilled')
         ])
+    ])
+])
+
+node {
+    echo '--- Webhook context ---'
+    // Why this build started is also shown on the build page (BitbucketWebHookCause).
+    echo "Event:      ${env.BITBUCKET_EVENT_KEY}"
+    echo "Repository: ${env.BITBUCKET_REPOSITORY} (${env.BITBUCKET_REPOSITORY_URL})"
+    echo "Workspace:  ${env.BITBUCKET_WORKSPACE} / ${env.BITBUCKET_REPOSITORY_NAME}"
+    echo "Actor:      ${env.BITBUCKET_ACTOR} (${env.BITBUCKET_ACTOR_ACCOUNT_ID})"
+    echo "Ref:        ${env.BITBUCKET_REF}"
+    echo "SSH URL:    ${env.BITBUCKET_REPO_SSH_URL}"
+
+    def event = env.BITBUCKET_EVENT_KEY ?: ''
+
+    if (event == 'repo:push') {
+        echo '--- Push build ---'
+        echo "Ref type: ${env.BITBUCKET_REF_TYPE}"
+        echo "Commits:  ${env.BITBUCKET_COMMIT_BEFORE} -> ${env.BITBUCKET_COMMIT_AFTER}"
+        echo "Message:  ${env.BITBUCKET_COMMIT_MESSAGE}"
     }
 
-    stages {
-        stage('Webhook context') {
-            steps {
-                // Why this build started is also shown on the build page (BitbucketWebHookCause).
-                echo "Event:      ${env.BITBUCKET_EVENT_KEY}"
-                echo "Repository: ${env.BITBUCKET_REPOSITORY} (${env.BITBUCKET_REPOSITORY_URL})"
-                echo "Workspace:  ${env.BITBUCKET_WORKSPACE} / ${env.BITBUCKET_REPOSITORY_NAME}"
-                echo "Actor:      ${env.BITBUCKET_ACTOR} (${env.BITBUCKET_ACTOR_ACCOUNT_ID})"
-                echo "Ref:        ${env.BITBUCKET_REF}"
-                echo "SSH URL:    ${env.BITBUCKET_REPO_SSH_URL}"
-            }
-        }
-
-        stage('Push build') {
-            when { environment name: 'BITBUCKET_EVENT_KEY', value: 'repo:push' }
-            steps {
-                echo "Ref type: ${env.BITBUCKET_REF_TYPE}"
-                echo "Commits:  ${env.BITBUCKET_COMMIT_BEFORE} -> ${env.BITBUCKET_COMMIT_AFTER}"
-                echo "Message:  ${env.BITBUCKET_COMMIT_MESSAGE}"
-            }
-        }
-
-        stage('Pull request build') {
-            when { expression { env.BITBUCKET_EVENT_KEY?.startsWith('pullrequest:') } }
-            steps {
-                echo "PR #${env.BITBUCKET_PR_ID}: ${env.BITBUCKET_PR_TITLE} [${env.BITBUCKET_PR_STATE}]"
-                echo "URL:     ${env.BITBUCKET_PR_URL}"
-                echo "Author:  ${env.BITBUCKET_PR_AUTHOR}"
-                echo "Merge:   ${env.BITBUCKET_PR_SOURCE_BRANCH} (${env.BITBUCKET_PR_SOURCE_COMMIT}) -> ${env.BITBUCKET_PR_TARGET_BRANCH}"
-                echo "Comment: ${env.BITBUCKET_PR_COMMENT}"
-            }
-        }
-
-        stage('Checkout') {
-            // Clone over SSH using the URL derived from the webhook payload.
-            // Replace 'bitbucket-ssh-key' with your SSH credentials ID.
-            when { expression { env.BITBUCKET_REPO_SSH_URL } }
-            steps {
-                checkout scmGit(
-                    userRemoteConfigs: [[url: env.BITBUCKET_REPO_SSH_URL, credentialsId: 'bitbucket-ssh-key']],
-                    branches: [[name: env.BITBUCKET_PR_SOURCE_COMMIT ?: env.BITBUCKET_COMMIT_AFTER ?: env.BITBUCKET_REF]]
-                )
-            }
-        }
+    if (event.startsWith('pullrequest:')) {
+        echo '--- Pull request build ---'
+        echo "PR #${env.BITBUCKET_PR_ID}: ${env.BITBUCKET_PR_TITLE} [${env.BITBUCKET_PR_STATE}]"
+        echo "URL:     ${env.BITBUCKET_PR_URL}"
+        echo "Author:  ${env.BITBUCKET_PR_AUTHOR}"
+        echo "Merge:   ${env.BITBUCKET_PR_SOURCE_BRANCH} (${env.BITBUCKET_PR_SOURCE_COMMIT}) -> ${env.BITBUCKET_PR_TARGET_BRANCH}"
+        echo "Comment: ${env.BITBUCKET_PR_COMMENT}"
     }
 }
