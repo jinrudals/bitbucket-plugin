@@ -59,6 +59,8 @@ Builds triggered by a webhook get these variables (empty when absent from the pa
 | `repo:push` | `BITBUCKET_REF_TYPE`, `BITBUCKET_COMMIT_BEFORE`, `BITBUCKET_COMMIT_AFTER`, `BITBUCKET_COMMIT_MESSAGE` |
 | `pullrequest:*` | `BITBUCKET_PR_ID`, `BITBUCKET_PR_TITLE`, `BITBUCKET_PR_STATE`, `BITBUCKET_PR_URL`, `BITBUCKET_PR_SOURCE_BRANCH`, `BITBUCKET_PR_SOURCE_COMMIT`, `BITBUCKET_PR_TARGET_BRANCH`, `BITBUCKET_PR_AUTHOR`, `BITBUCKET_PR_COMMENT` |
 
+A full example Jenkinsfile (trigger rules plus every environment variable) is in [docs/examples/Jenkinsfile](docs/examples/Jenkinsfile).
+
 ## Build
 
     mvn verify
