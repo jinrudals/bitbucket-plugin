@@ -7,13 +7,16 @@ import io.jenkins.plugins.bitbucketcloud.auth.BitbucketAuth;
 import io.jenkins.plugins.bitbucketcloud.config.BitbucketWorkspaceConnection;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -140,6 +143,44 @@ public final class BitbucketWorkspaceClient {
         return new PullRequestItemResult(response.outcome(), response.httpStatus(), parseId(response.body()));
     }
 
+    /**
+     * Reads a file at a branch name or commit hash. {@code NOT_FOUND} means the file or the ref does not exist.
+     */
+    public FileReadResult readFile(String workspace, String repo, String ref, String path, BitbucketAuth auth) {
+        Objects.requireNonNull(auth);
+        if (!BitbucketWorkspaceConnection.isValidWorkspaceSlug(workspace)
+                || !BitbucketWorkspaceConnection.isValidWorkspaceSlug(repo)) {
+            throw new IllegalArgumentException("Invalid Bitbucket Cloud workspace or repository slug.");
+        }
+        if (ref == null || ref.isBlank()) {
+            throw new IllegalArgumentException("The ref must not be empty.");
+        }
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("The path must not be empty.");
+        }
+        List<String> segments = new ArrayList<>();
+        for (String segment : path.trim().split("/")) {
+            if (segment.equals("..")) {
+                throw new IllegalArgumentException("The path must not contain '..'.");
+            }
+            if (!segment.isEmpty() && !segment.equals(".")) {
+                segments.add(encode(segment));
+            }
+        }
+        if (segments.isEmpty()) {
+            throw new IllegalArgumentException("The path must not be empty.");
+        }
+
+        URI uri = apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim() + "/src/" + encode(ref.trim())
+                + "/" + String.join("/", segments));
+        Response response = exchange(HttpRequest.newBuilder(uri).timeout(requestTimeout).GET(), auth);
+        return new FileReadResult(response.outcome(), response.httpStatus(), Optional.ofNullable(response.body()));
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
     private static Optional<String> parseId(String body) {
         if (body == null || body.isBlank()) {
             return Optional.empty();
@@ -230,6 +271,14 @@ public final class BitbucketWorkspaceClient {
         public CommitStatusResult {
             Objects.requireNonNull(outcome);
             Objects.requireNonNull(httpStatus);
+        }
+    }
+
+    public record FileReadResult(Outcome outcome, OptionalInt httpStatus, Optional<String> content) {
+        public FileReadResult {
+            Objects.requireNonNull(outcome);
+            Objects.requireNonNull(httpStatus);
+            Objects.requireNonNull(content);
         }
     }
 
