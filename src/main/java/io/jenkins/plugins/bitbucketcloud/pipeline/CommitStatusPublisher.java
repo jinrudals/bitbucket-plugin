@@ -82,7 +82,7 @@ final class CommitStatusPublisher {
         }
     }
 
-    private static Map<String, String> actionVariables(Run<?, ?> run) {
+    static Map<String, String> actionVariables(Run<?, ?> run) {
         BitbucketEnvAction action = run.getAction(BitbucketEnvAction.class);
         EnvVars vars = new EnvVars();
         if (action != null) {
@@ -91,7 +91,7 @@ final class CommitStatusPublisher {
         return vars;
     }
 
-    private static BitbucketAuth authFor(String workspace) throws AbortException {
+    static BitbucketAuth authFor(String workspace) throws AbortException {
         BitbucketWorkspaceConnection connection = BitbucketGlobalConfig.get().getWorkspaceConnections().stream()
                 .filter(c -> c.getWorkspace().equalsIgnoreCase(workspace))
                 .findFirst()

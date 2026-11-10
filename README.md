@@ -145,6 +145,37 @@ different sources are never mixed. The build log names the source that was used.
 A missing configuration, an unresolvable commit or an unknown `state` fails the step. A failing Bitbucket API call
 (for example HTTP 403) only prints a warning and does not fail the build.
 
+## Pull request comments from a pipeline
+
+`commentOnBitbucketPullRequest` creates a comment thread or a task on a pull request and returns the id of the
+created item (`null` if the API call failed). The workspace must be configured as above, and its API token needs
+permission to write pull request comments.
+
+```groovy
+// A top-level comment, which starts a thread.
+def threadId = commentOnBitbucketPullRequest content: 'Build passed.'
+
+// Reply to that thread.
+commentOnBitbucketPullRequest content: 'Deployed.', parentId: threadId
+
+// A pull request task.
+commentOnBitbucketPullRequest content: 'Update the changelog.', type: 'TASK'
+```
+
+| Argument | Description | Default |
+| --- | --- | --- |
+| `content` (required) | Comment or task text. | |
+| `type` | `THREAD` or `TASK`. | `THREAD` |
+| `parentId` | Id of a comment to reply to; `THREAD` only. | none (new thread) |
+| `pullRequestId` | Pull request number. | `BITBUCKET_PR_ID` |
+| `workspace`, `repo` | Repository of the pull request. | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` |
+
+Arguments you do not pass are resolved from the first of these sources that provides all of them, so values from
+different sources are never mixed: the `BitbucketEnvAction` of the build, then the `BITBUCKET_*` environment variables.
+The build log names the source that was used. A missing
+configuration, an unresolvable pull request, an unknown `type` or a `parentId` on a task fails the step. A failing
+Bitbucket API call only prints a warning. Inline comments and resolving items are not supported.
+
 ## Build
 
     mvn verify
