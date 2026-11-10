@@ -5,13 +5,14 @@
 // 1. Run the job once manually so Jenkins registers the trigger from this file.
 // 2. Copy the webhook URL (<JENKINS_ROOT_URL>/bitbucket/<folder>/<job>) and the secret into
 //    Bitbucket Cloud (Repository settings -> Webhooks) and select the events used below.
-//    A trigger declared here gets a new random secret on every run unless you pin it with
-//    secretText: '...' inside bitbucket(...).
+//    The secret comes from a Jenkins "Secret text" credential (id below), so it stays the same
+//    across runs. Without secretCredentialsId, a trigger declared here would get a new random
+//    secret on every run.
 
 properties([
     pipelineTriggers([
         // Rules are OR'ed: the job builds when any rule matches the delivery.
-        bitbucket(rules: [
+        bitbucket(secretCredentialsId: 'bitbucket-webhook-secret', rules: [
             // Pushes to main or release branches, except WIP branches.
             rule(events: 'repo:push', includeBranches: 'main release/*', excludeBranches: 'wip/*'),
             // Pull requests are matched on their source branch.
