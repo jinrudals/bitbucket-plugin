@@ -171,6 +171,17 @@ commentOnBitbucketPullRequest content: 'Update the changelog.', type: 'TASK'
 | `pullRequestId` | Pull request number. | `BITBUCKET_PR_ID` |
 | `workspace`, `repo` | Repository of the pull request. | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPOSITORY_NAME` |
 
+## Getting the project of a repository
+
+`getBitbucketProject` returns the project the repository belongs to as a map with `key`, `name`, `uuid`,
+`description` and `isPrivate`, or `null` if the repository has no project or the API call failed (a warning is
+logged). `workspace` and `repo` are resolved like in `readFileFromBitbucket`.
+
+```groovy
+def project = getBitbucketProject()
+echo "${project.key}: ${project.name}"
+```
+
 ## Reading a file from a pipeline
 
 `readFileFromBitbucket` returns the text of a file at a branch or commit, or `null` if the file or ref does not

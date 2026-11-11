@@ -196,6 +196,48 @@ public final class BitbucketWorkspaceClient {
         return new FileReadResult(response.outcome(), response.httpStatus(), Optional.ofNullable(response.body()));
     }
 
+    /** Reads the project a repository belongs to. {@code NOT_FOUND} means the repository does not exist. */
+    public ProjectReadResult getProject(String workspace, String repo, BitbucketAuth auth) {
+        Objects.requireNonNull(auth);
+        if (!BitbucketWorkspaceConnection.isValidWorkspaceSlug(workspace)
+                || !BitbucketWorkspaceConnection.isValidWorkspaceSlug(repo)) {
+            throw new IllegalArgumentException("Invalid Bitbucket Cloud workspace or repository slug.");
+        }
+        Response response = exchange(
+                HttpRequest.newBuilder(apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim()))
+                        .timeout(requestTimeout)
+                        .GET(),
+                auth);
+        if (response.outcome() != Outcome.SUCCESS) {
+            return new ProjectReadResult(response.outcome(), response.httpStatus(), Optional.empty());
+        }
+        Optional<Map<String, Object>> project = parseProject(response.body());
+        // A repository without a project, or an unreadable body, is reported as an error rather than an empty project.
+        return new ProjectReadResult(
+                project.isPresent() ? Outcome.SUCCESS : Outcome.HTTP_ERROR, response.httpStatus(), project);
+    }
+
+    private static Optional<Map<String, Object>> parseProject(String body) {
+        if (body == null || body.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode project = JSON.readTree(body).path("project");
+            if (!project.isObject() || project.path("key").asText("").isBlank()) {
+                return Optional.empty();
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("key", project.path("key").asText());
+            result.put("name", project.path("name").asText(""));
+            result.put("uuid", project.path("uuid").asText(""));
+            result.put("description", project.path("description").asText(""));
+            result.put("isPrivate", project.path("is_private").asBoolean(false));
+            return Optional.of(result);
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
     private static String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
@@ -310,6 +352,14 @@ public final class BitbucketWorkspaceClient {
             Objects.requireNonNull(outcome);
             Objects.requireNonNull(httpStatus);
             Objects.requireNonNull(content);
+        }
+    }
+
+    public record ProjectReadResult(Outcome outcome, OptionalInt httpStatus, Optional<Map<String, Object>> project) {
+        public ProjectReadResult {
+            Objects.requireNonNull(outcome);
+            Objects.requireNonNull(httpStatus);
+            Objects.requireNonNull(project);
         }
     }
 
