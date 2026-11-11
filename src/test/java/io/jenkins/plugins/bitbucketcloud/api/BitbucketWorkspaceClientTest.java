@@ -10,6 +10,7 @@ import hudson.util.Secret;
 import io.jenkins.plugins.bitbucketcloud.auth.BasicAuth;
 import java.net.URI;
 import java.time.Clock;
+import java.util.Optional;
 import java.time.Duration;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -117,5 +118,30 @@ class BitbucketWorkspaceClientTest {
         });
 
         assertEquals(BitbucketWorkspaceClient.Outcome.AUTHENTICATION_ERROR, result.outcome());
+    }
+
+    @Test
+    void readsFileFromSlashBranchByResolvingItToACommit(WireMockRuntimeInfo wm) {
+        stubFor(get(urlEqualTo("/2.0/repositories/acme/shop/refs/branches/jenkins%2Fupdate"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"target\": {\"hash\": \"abc123\"}}")));
+        stubFor(get(urlEqualTo("/2.0/repositories/acme/shop/src/abc123/repo.yaml"))
+                .willReturn(aResponse().withStatus(200).withBody("schemaVersion: 1")));
+
+        var result = new BitbucketWorkspaceClient(URI.create(wm.getHttpBaseUrl()), Duration.ofSeconds(2))
+                .readFile("acme", "shop", "jenkins/update", "repo.yaml", new BasicAuth("u", Secret.fromString("p")));
+
+        assertEquals(BitbucketWorkspaceClient.Outcome.SUCCESS, result.outcome());
+        assertEquals(Optional.of("schemaVersion: 1"), result.content());
+    }
+
+    @Test
+    void reportsNotFoundWhenSlashBranchDoesNotExist(WireMockRuntimeInfo wm) {
+        stubFor(get(urlEqualTo("/2.0/repositories/acme/shop/refs/branches/gone%2Fbranch"))
+                .willReturn(aResponse().withStatus(404)));
+
+        var result = new BitbucketWorkspaceClient(URI.create(wm.getHttpBaseUrl()), Duration.ofSeconds(2))
+                .readFile("acme", "shop", "gone/branch", "repo.yaml", new BasicAuth("u", Secret.fromString("p")));
+
+        assertEquals(BitbucketWorkspaceClient.Outcome.NOT_FOUND, result.outcome());
     }
 }
