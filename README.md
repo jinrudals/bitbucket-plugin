@@ -12,7 +12,8 @@ Open **Manage Jenkins → System → Bitbucket Cloud** and add one connection fo
 
 Supported credential type:
 
-- **Bitbucket Authentication** — Bitbucket username and API token/app password.
+- **Bitbucket Authentication** — Bitbucket username and API token/app password (HTTP Basic).
+- **Secret text** — a Bitbucket Workspace/Repository Access Token (sent as `Authorization: Bearer`).
 
 Credentials are selected from Jenkins system/global credentials. Grant each credential sufficient Bitbucket Cloud
 permissions to read its workspace. The connection test sends a read-only request to the fixed Bitbucket Cloud API

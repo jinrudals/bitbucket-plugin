@@ -7,6 +7,7 @@ import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.security.ACL;
 import java.util.Optional;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 
 public final class AuthResolver {
     private AuthResolver() {}
@@ -25,6 +26,9 @@ public final class AuthResolver {
                 CredentialsMatchers.withId(credentialsId));
         if (c instanceof BitbucketAuthenticationCredentials a) {
             return Optional.of(new BasicAuth(a.getUsername(), a.getApiToken()));
+        }
+        if (c instanceof StringCredentials t) {
+            return Optional.of(new BearerAuth(t.getSecret()));
         }
         return Optional.empty();
     }
