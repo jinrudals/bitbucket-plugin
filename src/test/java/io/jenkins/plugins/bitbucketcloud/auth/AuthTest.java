@@ -9,6 +9,7 @@ import hudson.util.Secret;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.util.Optional;
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
 import org.junit.jupiter.api.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.junit.jupiter.WithJenkins;
@@ -28,11 +29,28 @@ class AuthTest {
     }
 
     @Test
-    void resolverOnlyAcceptsBitbucketAuthenticationCredentials(JenkinsRule j) throws Exception {
+    void bearerAuthSetsBearerHeader() {
+        assertEquals("Bearer tok", header(new BearerAuth(Secret.fromString("tok"))));
+    }
+
+    @Test
+    void resolverMapsSecretTextToBearerAuth(JenkinsRule j) throws Exception {
+        SystemCredentialsProvider.getInstance()
+                .getCredentials()
+                .add(new StringCredentialsImpl(CredentialsScope.GLOBAL, "wat", "d", Secret.fromString("tok")));
+        assertEquals(
+                "Bearer tok",
+                header(AuthResolver.resolveWorkspaceCredential("wat").orElseThrow()));
+    }
+
+    @Test
+    void resolverRejectsUnsupportedCredentialTypes(JenkinsRule j) throws Exception {
         var store = SystemCredentialsProvider.getInstance().getCredentials();
-        store.add(new BitbucketAuthenticationCredentials(CredentialsScope.GLOBAL, "ba", "d", "u", Secret.fromString("p")));
+        store.add(new BitbucketAuthenticationCredentials(
+                CredentialsScope.GLOBAL, "ba", "d", "u", Secret.fromString("p")));
         store.add(new UsernamePasswordCredentialsImpl(CredentialsScope.GLOBAL, "up", "d", "u", "p"));
-        assertInstanceOf(BasicAuth.class, AuthResolver.resolveWorkspaceCredential("ba").orElseThrow());
+        assertInstanceOf(
+                BasicAuth.class, AuthResolver.resolveWorkspaceCredential("ba").orElseThrow());
         assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential("up"));
         assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential("nope"));
         assertEquals(Optional.empty(), AuthResolver.resolveWorkspaceCredential(null));

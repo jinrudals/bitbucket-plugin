@@ -1,7 +1,6 @@
 package io.jenkins.plugins.bitbucketcloud.config;
 
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
@@ -20,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.verb.POST;
@@ -71,13 +71,14 @@ public class BitbucketWorkspaceConnection extends AbstractDescribableImpl<Bitbuc
                             Jenkins.get(),
                             StandardCredentials.class,
                             URIRequirementBuilder.fromUri(BITBUCKET_AUTH_URI).build(),
-                            CredentialsMatchers.instanceOf(BitbucketAuthenticationCredentials.class))
+                            CredentialsMatchers.anyOf(
+                                    CredentialsMatchers.instanceOf(BitbucketAuthenticationCredentials.class),
+                                    CredentialsMatchers.instanceOf(StringCredentials.class)))
                     .includeCurrentValue(credentialsId);
         }
 
         @POST
-        public FormValidation doTestConnection(
-                @QueryParameter String workspace, @QueryParameter String credentialsId) {
+        public FormValidation doTestConnection(@QueryParameter String workspace, @QueryParameter String credentialsId) {
             if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
                 return FormValidation.error("Administrator permission is required.");
             }
@@ -99,9 +100,11 @@ public class BitbucketWorkspaceConnection extends AbstractDescribableImpl<Bitbuc
                 case UNAUTHORIZED -> FormValidation.error("Bitbucket Cloud rejected the credential (HTTP 401).");
                 case FORBIDDEN -> FormValidation.error("The credential cannot read this workspace (HTTP 403).");
                 case NOT_FOUND -> FormValidation.error("The workspace was not found or is not accessible (HTTP 404).");
-                case HTTP_ERROR -> result.httpStatus().isPresent()
-                        ? FormValidation.error("Bitbucket Cloud returned HTTP " + result.httpStatus().getAsInt() + ".")
-                        : FormValidation.error("Bitbucket Cloud returned an unexpected response.");
+                case HTTP_ERROR ->
+                    result.httpStatus().isPresent()
+                            ? FormValidation.error("Bitbucket Cloud returned HTTP "
+                                    + result.httpStatus().getAsInt() + ".")
+                            : FormValidation.error("Bitbucket Cloud returned an unexpected response.");
                 case AUTHENTICATION_ERROR -> FormValidation.error("Bitbucket authentication could not be established.");
                 case TIMEOUT -> FormValidation.error("The Bitbucket Cloud connection test timed out.");
                 case NETWORK_ERROR -> FormValidation.error("Could not connect to Bitbucket Cloud.");
