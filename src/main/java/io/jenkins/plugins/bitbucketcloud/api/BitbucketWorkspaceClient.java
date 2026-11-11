@@ -171,7 +171,26 @@ public final class BitbucketWorkspaceClient {
             throw new IllegalArgumentException("The path must not be empty.");
         }
 
-        URI uri = apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim() + "/src/" + encode(ref.trim())
+        String resolvedRef = ref.trim();
+        if (resolvedRef.contains("/")) {
+            // /src/{ref}/{path} cannot address a branch whose name contains '/', so resolve it to a commit hash.
+            Response branch = exchange(
+                    HttpRequest.newBuilder(apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim()
+                                    + "/refs/branches/" + encode(resolvedRef)))
+                            .timeout(requestTimeout)
+                            .GET(),
+                    auth);
+            if (branch.outcome() != Outcome.SUCCESS) {
+                return new FileReadResult(branch.outcome(), branch.httpStatus(), Optional.empty());
+            }
+            String hash = parseBranchHash(branch.body());
+            if (hash == null) {
+                return new FileReadResult(Outcome.HTTP_ERROR, branch.httpStatus(), Optional.empty());
+            }
+            resolvedRef = hash;
+        }
+
+        URI uri = apiUri("/2.0/repositories/" + workspace.trim() + "/" + repo.trim() + "/src/" + encode(resolvedRef)
                 + "/" + String.join("/", segments));
         Response response = exchange(HttpRequest.newBuilder(uri).timeout(requestTimeout).GET(), auth);
         return new FileReadResult(response.outcome(), response.httpStatus(), Optional.ofNullable(response.body()));
@@ -179,6 +198,18 @@ public final class BitbucketWorkspaceClient {
 
     private static String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private static String parseBranchHash(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            String hash = JSON.readTree(body).path("target").path("hash").asText("");
+            return hash.isBlank() ? null : hash;
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     private static Optional<String> parseId(String body) {

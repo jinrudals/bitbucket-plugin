@@ -64,13 +64,16 @@ class ReadFileFromBitbucketStepTest {
     }
 
     @Test
-    void encodesSlashesInTheBranchName(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
+    void resolvesSlashBranchNamesToACommit(JenkinsRule j, WireMockRuntimeInfo wm) throws Exception {
         configure(wm);
-        stubFor(get(urlEqualTo(SRC + "feature%2Fx/README.md")).willReturn(aResponse().withStatus(200).withBody("ok")));
+        stubFor(get(urlEqualTo("/2.0/repositories/acme/shop/refs/branches/feature%2Fx"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"target\": {\"hash\": \"abc123\"}}")));
+        stubFor(get(urlEqualTo(SRC + "abc123/README.md"))
+                .willReturn(aResponse().withStatus(200).withBody("ok")));
 
         j.buildAndAssertSuccess(job(j, "readFileFromBitbucket path: 'README.md', ref: 'feature/x', " + ARGS));
 
-        verify(1, getRequestedFor(urlEqualTo(SRC + "feature%2Fx/README.md")));
+        verify(1, getRequestedFor(urlEqualTo(SRC + "abc123/README.md")));
     }
 
     @Test
