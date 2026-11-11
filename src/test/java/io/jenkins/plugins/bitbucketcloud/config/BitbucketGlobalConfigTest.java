@@ -100,7 +100,7 @@ class BitbucketGlobalConfigTest {
 
         assertTrue(options.stream().anyMatch(option -> "ba".equals(option.value)));
         assertFalse(options.stream().anyMatch(option -> "up".equals(option.value)));
-        assertFalse(options.stream().anyMatch(option -> "str".equals(option.value)));
+        assertTrue(options.stream().anyMatch(option -> "str".equals(option.value)));
         assertFalse(options.stream().anyMatch(option -> "unsupported".equals(option.value)));
     }
 
